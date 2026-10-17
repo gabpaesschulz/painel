@@ -140,6 +140,35 @@
   }
 
   /* ---------- agenda ---------- */
+  let selDay = 0, selTimer = null;       // 0 = hoje (visão normal); 1..6 = dia escolhido na faixa da semana
+  function selectDay(i) {
+    selDay = i === selDay ? 0 : i;
+    clearTimeout(selTimer);
+    if (selDay) selTimer = setTimeout(() => { selDay = 0; renderAgenda(); }, 45000);   // volta sozinho para hoje
+    renderAgenda();
+    fitSides();
+  }
+  P.view.resetDay = () => { if (selDay) { selDay = 0; clearTimeout(selTimer); renderAgenda(); fitSides(); } };
+
+  function renderDayView(list) {
+    const base = U.startOfDay(new Date()), day = U.addDays(base, selDay), next = U.addDays(day, 1);
+    const evs = list.filter(e => e.start < next && e.end > day);
+    const wd = U.cap(day.toLocaleDateString("pt-BR", { weekday: "long" }));
+    const full = day.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+    const shown = evs.slice(0, 4);
+    el.feature.classList.remove("now-on");
+    el.feature.classList.add("dayview");
+    el.feature.innerHTML =
+      `<div class="ft dv"><div class="dvw">${day.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</div><div class="dvn">${day.getDate()}</div></div>` +
+      `<div class="fb"><div class="fl">${wd}, ${full}</div>` +
+      (shown.length
+        ? shown.map(e => `<div class="dvrow"><span class="t">${e.allDay ? "Dia todo" : U.fmtTime(e.start)}</span><span class="n">${e.kind === "reminder" ? P.ui("bell", "bell") : ""}${U.esc(e.title)}</span></div>`).join("") +
+          (evs.length > shown.length ? `<div class="fs">e mais ${evs.length - shown.length}</div>` : "")
+        : `<div class="fn">Nada marcado</div>`) +
+      `<div class="fs back">Toque em “hoje” para voltar</div></div>`;
+    el.later.innerHTML = "";
+  }
+
   function countdown(ev) {
     const now = new Date();
     if (ev.start <= now) return "Acontecendo agora";
@@ -154,8 +183,10 @@
     el.week.innerHTML = Array.from({ length: 7 }, (_, i) => {
       const d = U.addDays(base, i);
       const n = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
-      return `<div class="wd ${i === 0 ? "today" : ""}"><div class="n">${n}</div><div class="d">${d.getDate()}</div>` +
-        `<div class="dots">${"<i></i>".repeat(Math.min(3, counts[i] || 0))}</div></div>`;
+      const cls = (i === 0 ? "today " : "") + (i === selDay && i > 0 ? "sel" : "");
+      return `<button class="wd ${cls}" data-i="${i}" aria-label="${U.esc(d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }))}">` +
+        `<div class="n">${n}</div><div class="d">${d.getDate()}</div>` +
+        `<div class="dots">${"<i></i>".repeat(Math.min(3, counts[i] || 0))}</div></button>`;
     }).join("");
   }
 
@@ -166,6 +197,8 @@
     el.agendaNote.textContent = cd && cd.sample ? "exemplos · agenda não ligada" : "";
     renderWeek();
 
+    if (selDay > 0) { renderDayView(list); return; }
+    el.feature.classList.remove("dayview");
     const first = list[0];
     if (!first) {
       el.feature.classList.remove("now-on");
@@ -241,6 +274,8 @@
 
   P.view.init = function () {
     grab();
+    el.week.addEventListener("click", e => { const b = e.target.closest(".wd"); if (b) selectDay(+b.dataset.i); });
+    P.bus.on("wake", () => P.view.resetDay());
     P.bus.on("cfg", () => renderAll());
     P.bus.on("data", which => {
       if (which === "weather") renderWeather();

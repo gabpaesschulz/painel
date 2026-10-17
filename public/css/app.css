@@ -104,7 +104,7 @@ body::before {
 .note { font-size: calc(2.5 * var(--t)); color: var(--soft); font-weight: 500; }
 
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: .9rem; flex: none; }
-.wd { text-align: center; padding: .9rem 0 1.1rem; border-radius: 1.8rem; border: 1px solid var(--rule); background: var(--glass); }
+.wd { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; text-align: center; padding: .9rem 0 1.1rem; border-radius: 1.8rem; border: 1px solid var(--rule); background: var(--glass); }
 .wd .n { font-size: calc(2.4 * var(--t)); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); font-weight: 700; }
 .wd .d { font-family: var(--display); font-variation-settings: var(--display-fvs); font-weight: var(--display-w); font-size: calc(5.4 * var(--t2)); line-height: 1.05; }
 .wd .dots { display: flex; gap: .5rem; justify-content: center; min-height: 1.1rem; margin-top: .4rem; }
@@ -221,3 +221,17 @@ body::before {
 [data-lite="1"] .panel, [data-lite="1"] #settings .scrim { -webkit-backdrop-filter: none; backdrop-filter: none; }
 [data-lite="1"] body::before { display: none; }
 [data-lite="1"] .app, [data-lite="1"] #sky { transition: none; }
+
+/* faixa da semana tocável + visão de um dia */
+.wd.sel { border-color: var(--accent); box-shadow: 0 0 0 .35rem var(--accent); }
+.wd:active { transform: scale(.97); }
+.feature.dayview { grid-template-columns: auto 1fr; }
+.feature .ft.dv { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.feature .dvw { font-family: var(--text); font-size: calc(3.4 * var(--t)); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); font-weight: 700; }
+.feature .dvn { font-size: calc(11 * var(--t2)); }
+.dvrow { display: grid; grid-template-columns: 14rem 1fr; gap: 1.6rem; align-items: baseline; font-size: calc(4.4 * var(--t)); line-height: 1.2; padding: .35rem 0; }
+.dvrow .t { font-family: var(--display); font-variation-settings: var(--display-fvs); font-weight: var(--display-w); font-variant-numeric: lining-nums tabular-nums; color: var(--accent); }
+.dvrow .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dvrow .n .bell { display: inline-block; width: .9em; height: .9em; vertical-align: -.1em; margin-right: .35em; color: var(--accent); }
+.feature .fs.back { color: var(--soft); font-size: calc(2.7 * var(--t)); font-weight: 500; margin-top: 1rem; }
+[data-big="1"] .feature.dayview { grid-template-columns: 1fr; }
