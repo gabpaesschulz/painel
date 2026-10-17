@@ -16,6 +16,18 @@ painel/
 └─ DESIGN.md          ← pesquisa e decisões de design (com fontes)
 ```
 
+## Endereços deste projeto
+
+| O quê | Onde |
+|---|---|
+| Painel (é o que vai no Start URL do tablet) | https://gabpaesschulz.github.io/painel/ |
+| Configurações direto | https://gabpaesschulz.github.io/painel/#config |
+| Código | https://github.com/gabpaesschulz/painel |
+| Servidor da agenda (Cloudflare) | https://painel.gabpaesschulz.workers.dev |
+| Pasta no PC | `C:\Users\gabri\painel` |
+
+O site é público, mas **a agenda não está nele**: o endereço secreto do Google fica guardado só em cada aparelho onde foi colado. Quem abre o link vê só o tempo, o rio e compromissos de exemplo.
+
 ## 1. Ver no seu PC
 
 Dê dois cliques em **iniciar.bat** (precisa do Python instalado). Abre em http://localhost:8765/.

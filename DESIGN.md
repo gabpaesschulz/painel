@@ -39,8 +39,8 @@ Fonte: [Fully Kiosk — documentação](https://www.fully-kiosk.com/en/)
 | Tudo em unidades da altura da tela (`rem` = 1 % da altura) | o painel inteiro escala em qualquer tablet |
 | Quando falta espaço, **some o menos importante** (nunca corta no meio) | relógio, tempo agora e próximo compromisso nunca somem; rio só em último caso |
 | Próximo compromisso em destaque, com "daqui a 3 horas" | a pergunta real é "o que vem agora?" |
-| Faixa de 7 dias com pontinhos | o "calendário da semana" sem virar uma grade ilegível |
-| Medidor do rio com as faixas oficiais | cor + posição + palavra ("Observação"): três pistas, não só cor |
+| Faixa de 7 dias com pontinhos (v2: também o tempo de cada dia e os feriados; cada dia é tocável) | o "calendário da semana" sem virar uma grade ilegível |
+| Rio com as faixas oficiais (v2: gráfico de 24 h no lugar do medidor) | cor + posição + palavra ("Observação"): três pistas, não só cor |
 | Frases amigáveis ("Leve o guarda-chuva") | linguagem simples |
 | Lado do relógio configurável | perda de visão de um lado; sem guia específico na literatura |
 | Descanso: tela escura, relógio discreto, desloca 1–3 px por minuto | economiza energia, evita imagem fixa |
