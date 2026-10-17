@@ -1,0 +1,100 @@
+/* Temas. Todos têm contraste de texto ≥ 7:1 (WCAG AAA) — verificado por script (tools/contrast.js). */
+
+:root, [data-theme="noite"] {
+  --bg: #0a0908;
+  --text-c: #fff7e8;
+  --soft: #dcd2bf;
+  --accent: #ffc857;
+  --accent-ink: #1a1306;
+  --hot: #ffa66e;
+  --cold: #92d6ff;
+  --glass: rgba(255, 247, 232, .05);
+  --rule: rgba(255, 247, 232, .16);
+  --shadow: none;
+  --tone1: #26364a;
+  --tone2: #5e4217;
+  --grain: .09;
+  --glow: 1;
+}
+[data-theme="papel"] {
+  --bg: #f7f0e3;
+  --text-c: #1c1712;
+  --soft: #4a4036;
+  --accent: #9c3a14;
+  --accent-ink: #fff8ee;
+  --hot: #a8410d;
+  --cold: #0b5a86;
+  --glass: rgba(255, 255, 255, .62);
+  --rule: rgba(28, 23, 18, .2);
+  --shadow: 0 .6rem 2.4rem rgba(60, 40, 10, .12);
+  --tone1: #fff3d4;
+  --tone2: #efd6a8;
+  --grain: .05;
+  --glow: 1;
+}
+[data-theme="contraste"] {
+  --bg: #000000;
+  --text-c: #ffffff;
+  --soft: #f0f0f0;
+  --accent: #ffe600;
+  --accent-ink: #000000;
+  --hot: #ffb347;
+  --cold: #66d9ff;
+  --glass: #0c0c0c;
+  --rule: rgba(255, 255, 255, .5);
+  --shadow: none;
+  --tone1: #000000;
+  --tone2: #000000;
+  --grain: 0;
+  --glow: 0;
+}
+[data-theme="oceano"] {
+  --bg: #061320;
+  --text-c: #eaf7ff;
+  --soft: #c3dbe8;
+  --accent: #5fe0cf;
+  --accent-ink: #03231f;
+  --hot: #ffb38a;
+  --cold: #8fd0ff;
+  --glass: rgba(220, 245, 255, .06);
+  --rule: rgba(220, 245, 255, .18);
+  --shadow: none;
+  --tone1: #0d3a55;
+  --tone2: #0b4f4a;
+  --grain: .08;
+  --glow: 1;
+}
+[data-theme="floresta"] {
+  --bg: #07120d;
+  --text-c: #f3f7ea;
+  --soft: #cddcc4;
+  --accent: #f2c14e;
+  --accent-ink: #1d1503;
+  --hot: #ffae7a;
+  --cold: #9fdcff;
+  --glass: rgba(235, 250, 225, .055);
+  --rule: rgba(235, 250, 225, .17);
+  --shadow: none;
+  --tone1: #123a2a;
+  --tone2: #4a3a12;
+  --grain: .08;
+  --glow: 1;
+}
+
+/* Cor da luz do céu conforme a hora do dia (mistura com o tom do tema) */
+[data-sky="dawn"]  { --sky1: #c9835a; --sky2: #e6a36a; }
+[data-sky="day"]   { --sky1: #4f7fb0; --sky2: #c9a24a; }
+[data-sky="dusk"]  { --sky1: #a2476a; --sky2: #d9683c; }
+[data-sky="night"] { --sky1: #1d2b5a; --sky2: #4a2468; }
+
+:root { --g1: var(--tone1); --g2: var(--tone2); }
+@supports (color: color-mix(in srgb, red, blue)) {
+  :root {
+    --g1: color-mix(in srgb, var(--tone1) 62%, var(--sky1, var(--tone1)));
+    --g2: color-mix(in srgb, var(--tone2) 62%, var(--sky2, var(--tone2)));
+  }
+}
+
+/* Tema claro: a luz do céu fica só um leve tom quente (sem azul-noite no papel) */
+[data-theme="papel"][data-sky] { --sky1: var(--tone1); --sky2: var(--tone2); }
+[data-theme="contraste"][data-sky] { --sky1: #000; --sky2: #000; }

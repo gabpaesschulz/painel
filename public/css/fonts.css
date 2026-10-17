@@ -1,0 +1,47 @@
+/* Fontes empacotadas localmente (funcionam sem internet). Licença OFL — ver README. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("../assets/fonts/fraunces-var.woff2") format("woff2");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("../assets/fonts/atkinson-next-var.woff2") format("woff2");
+  font-weight: 200 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Lexend";
+  src: url("../assets/fonts/lexend-var.woff2") format("woff2");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Literata";
+  src: url("../assets/fonts/literata-var.woff2") format("woff2");
+  font-weight: 200 900; font-style: normal; font-display: swap;
+}
+
+/* Combinações de fonte (escolhidas nas configurações) */
+:root, [data-font="editorial"] {
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --display-fvs: "SOFT" 70, "opsz" 144;
+  --display-w: 700;
+  --text: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, Arial, sans-serif;
+}
+[data-font="limpo"] {
+  --display: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, Arial, sans-serif;
+  --display-fvs: normal;
+  --display-w: 700;
+  --text: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, Arial, sans-serif;
+}
+[data-font="moderno"] {
+  --display: "Lexend", "Segoe UI", Roboto, Arial, sans-serif;
+  --display-fvs: normal;
+  --display-w: 600;
+  --text: "Lexend", "Segoe UI", Roboto, Arial, sans-serif;
+}
+[data-font="classico"] {
+  --display: "Literata", Georgia, "Times New Roman", serif;
+  --display-fvs: "opsz" 72;
+  --display-w: 700;
+  --text: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, Arial, sans-serif;
+}

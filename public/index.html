@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="noite" data-font="editorial" data-sky="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0908">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="google" content="notranslate">
+<title>Painel</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/settings.css">
+</head>
+<body>
+<div id="sky"></div>
+
+<main class="app" id="app" data-side="left">
+
+  <section class="side side-a">
+    <header class="hero rise" style="animation-delay:.05s">
+      <div class="kicker" id="greet">Bom dia</div>
+      <div class="time" id="time">--:--</div>
+      <div class="date" id="date"></div>
+    </header>
+
+    <div class="rule"></div>
+    <section class="wx-now rise" id="wxNow" style="animation-delay:.2s"></section>
+    <div id="wxHint" class="rise" style="animation-delay:.28s"></div>
+
+    <div class="rule"></div>
+    <section class="wx-more rise" id="wxMore" style="animation-delay:.35s"></section>
+  </section>
+
+  <section class="side side-b">
+    <div class="head rise" style="animation-delay:.1s">
+      <div class="kicker">Meus compromissos</div>
+      <div class="note" id="agendaNote"></div>
+    </div>
+    <div class="week rise" id="week" style="animation-delay:.16s"></div>
+    <article class="panel feature rise" id="feature" style="animation-delay:.24s"></article>
+    <div class="later rise" id="later" style="animation-delay:.32s"></div>
+    <section class="panel river rise" id="river" style="animation-delay:.42s"></section>
+  </section>
+
+</main>
+
+<div id="status" hidden></div>
+
+<button id="gear" aria-label="Configurações (segure por 1 segundo)">
+  <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
+  <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+
+<div id="rest" hidden>
+  <div class="ri"><div class="rt"></div><div class="rd"></div><div class="rn"></div></div>
+</div>
+
+<div id="settings" hidden></div>
+
+<script>
+  // leitor de agenda (.ics): é um módulo ES, por isso o import()
+  window.icalReady = import("./vendor/ical.min.js").then(m => { window.ICAL = m.default; }).catch(e => console.warn("ical:", e));
+</script>
+<script src="js/ui-icons.js"></script>
+<script src="js/core.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/data.js"></script>
+<script src="js/view-main.js"></script>
+<script src="js/kiosk.js"></script>
+<script src="js/settings.js"></script>
+<script>
+  // ícone da engrenagem (a mesma da lista de ícones embutidos)
+  document.querySelector("#gear svg.ic").innerHTML = (window.UI_ICONS || {}).settings || "";
+</script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Cloudflare Worker do painel. Para colocar no ar:  npx wrangler deploy
+name = "painel"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# deixa o Worker tratar /api/* antes de procurar arquivos
+run_worker_first = ["/api/*"]

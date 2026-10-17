@@ -1,0 +1,43 @@
+# Publica o painel no GitHub Pages e renova a cópia do nível do rio a cada 15 minutos.
+# (O servidor da Defesa Civil não deixa o navegador — nem o Cloudflare — lerem direto, por isso esta cópia.)
+name: Publicar painel
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Baixar nível do rio (AlertaBLU / Defesa Civil de Blumenau)
+        run: |
+          if curl -fsSk -m 30 "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json?a=$RANDOM" -o /tmp/river.json \
+             && python3 -c "import json;d=json.load(open('/tmp/river.json'));assert d['niveis']"; then
+            cp /tmp/river.json public/river.json
+            echo "river.json atualizado"
+          else
+            echo "::warning::não consegui baixar o rio; mantendo a cópia anterior"
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

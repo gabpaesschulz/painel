@@ -1,0 +1,15 @@
+{
+  "name": "Painel",
+  "short_name": "Painel",
+  "description": "Painel de casa: hora, tempo, agenda e nível do rio, em letras grandes.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0908",
+  "theme_color": "#0a0908",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
