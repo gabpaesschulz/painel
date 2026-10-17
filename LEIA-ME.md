@@ -54,7 +54,7 @@ O Worker só aceita endereços `calendar.google.com/calendar/ical/…` e não gu
 1. No computador: **calendar.google.com → ⚙ Configurações → (sua agenda) → "Endereço secreto no formato iCal"** → copiar.
 2. No tablet: **segure a engrenagem (canto inferior direito) por 1 segundo → Agenda → Endereço secreto**, cole e toque em **Testar agora**.
 
-Com isso, tudo que a Alexa adicionar na agenda ("Alexa, adicione dentista na quinta às 9h") aparece no painel em até 3 minutos. O endereço secreto fica só neste tablet; quem o tiver vê a agenda, então não compartilhe.
+Com isso, tudo que a Alexa adicionar na agenda ("Alexa, adicione dentista na quinta às 9h") aparece no painel em cerca de 1 minuto. O endereço secreto fica só neste tablet; quem o tiver vê a agenda, então não compartilhe.
 
 *Alternativa:* "Agenda pública" (e-mail da agenda + chave de API do Google). É mais simples, mas qualquer pessoa com o link vê seus compromissos. O login "Entrar com Google" não foi usado de propósito: o Google bloqueia login dentro de WebView e a sessão expira em 1 hora, ruim para um painel sempre ligado.
 

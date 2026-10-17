@@ -44,7 +44,7 @@ export default {
         return json({ error: "só aceito endereços iCal do Google Agenda" }, 400);
       }
       try {
-        const r = await fetch(target.toString(), { cf: { cacheTtl: 60, cacheEverything: true } });
+        const r = await fetch(target.toString(), { cf: { cacheTtl: 10, cacheEverything: true } });
         if (!r.ok) return json({ error: "o Google respondeu " + r.status }, r.status === 404 ? 404 : 502);
         return new Response(r.body, { status: 200, headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-store", ...CORS } });
       } catch (e) {

@@ -24,7 +24,7 @@
 
   setInterval(P.weather.refresh, 15 * 60000);
   setInterval(P.river.refresh, 10 * 60000);
-  setInterval(P.cal.refresh, 3 * 60000);
+  setInterval(P.cal.refresh, 60000);
 
   // ao acordar, atualiza o que estiver velho
   P.bus.on("wake", () => {
