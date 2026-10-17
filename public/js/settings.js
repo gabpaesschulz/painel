@@ -10,7 +10,7 @@
     { id: "city",   label: "Cidade e tempo", icon: "cloud-sun" },
     { id: "agenda", label: "Agenda",        icon: "calendar" },
     { id: "rem",    label: "Lembretes",     icon: "bell" },
-    { id: "river",  label: "Rio",           icon: "waves" },
+    { id: "river",  label: "Rio e Defesa Civil", icon: "waves" },
     { id: "screen", label: "Tela",          icon: "monitor-smartphone" },
     { id: "adv",    label: "Avançado",      icon: "sliders-horizontal" },
   ];
@@ -74,10 +74,11 @@
       `<div class="fld" style="margin-top:.8em"><input class="in" id="citySearch" placeholder="Digite o nome de outra cidade"><button class="btn primary" data-act="citySearch">Buscar</button></div>` +
       `<div class="results" id="cityResults">${testBox.city || ""}</div>`) +
       sec("Previsão",
-        row("O que mostrar", "Próximos dias ou o dia de hoje dividido em manhã, tarde e noite.",
-          seg("weatherMode", [["dias", "Próximos dias"], ["periodos", "Manhã/Tarde/Noite"]])) +
+        row("Embaixo do tempo de agora", "“Próximas horas” mostra agora, hoje à noite e amanhã de manhã e à tarde.",
+          seg("weatherMode", [["horas", "Próximas horas"], ["dias", "Próximos dias"]])) +
         (P.cfg.get("weatherMode") === "dias" ? row("Quantos dias", "", seg("forecastDays", [[1, "1"], [2, "2"], [3, "3"]])) : "") +
-        row("Frase amiga", "“Hoje deve chover. Leve o guarda-chuva.”", toggle("hint")));
+        row("Frase amiga", "“Deve chover à tarde. Leve o guarda-chuva.”", toggle("hint")) +
+        row("Tempo na faixa da semana", "Um ícone e a máxima de cada dia, embaixo da data.", toggle("weekWeather")));
   }
 
   function tabAgenda() {
@@ -113,7 +114,8 @@
       body += callout("", "Mostrando compromissos de <b>exemplo</b>. Escolha uma das opções acima para ligar a sua agenda.");
     }
 
-    body += row("Olhar quantos dias à frente", "", seg("calendar.daysAhead", [[3, "3"], [7, "7"], [14, "14"]])) +
+    body += row("Feriados", "Feriados nacionais (e o aniversário de Blumenau) na agenda e na faixa da semana.", toggle("holidays")) +
+      row("Olhar quantos dias à frente", "", seg("calendar.daysAhead", [[3, "3"], [7, "7"], [14, "14"]])) +
       row("Compromissos listados abaixo do próximo", "", seg("calendar.laterCount", [[2, "2"], [3, "3"], [4, "4"], [5, "5"]]));
     if (c.mode !== "demo") body += `<div class="btns"><button class="btn primary" data-act="testCal">Testar agora</button></div><div id="calTest" style="margin-top:.8em">${testBox.cal || ""}</div>`;
     return sec("Google Agenda", body);
@@ -134,14 +136,24 @@
   }
 
   function tabRiver() {
-    const r = P.data.river;
+    const r = P.data.river, a = P.data.alerts, st = P.alerts.status && P.alerts.status();
     const near = P.river.isNear();
-    return sec("Nível do rio Itajaí-Açu",
-      row("Mostrar no painel", "Dados oficiais da Defesa Civil de Blumenau (AlertaBLU), atualizados a cada hora.", toggle("river.show")) +
-      (!near ? callout("bad", "A cidade escolhida fica longe de Blumenau. Esta informação é só do rio em Blumenau.") : "") +
-      (r ? `<dl class="kv" style="margin-top:1em"><dt>Nível</dt><dd>${r.level.toFixed(2).replace(".", ",")} m</dd><dt>Situação</dt><dd>${esc(r.cond.name)}</dd><dt>Última leitura</dt><dd>${new Date(r.last).toLocaleString("pt-BR")}</dd><dt>Fonte</dt><dd>${esc(r.source)}</dd></dl>` : "") +
-      `<div class="btns"><button class="btn" data-act="testRiver">${P.ui("refresh-cw")} Atualizar agora</button></div><div id="riverTest" style="margin-top:.8em">${testBox.river || ""}</div>` +
-      `<p class="help" style="margin-top:1em">Faixas oficiais: <b>Normalidade</b> até 3 m · <b>Observação</b> 3 m · <b>Atenção</b> 4 m · <b>Alerta</b> 6 m · <b>Alerta máximo</b> 8 m.</p>`);
+    const cota = +P.cfg.get("river.cota") || 0;
+    const bairro = P.cfg.get("alerts.bairro") || "";
+    const opts = a ? a.bairros.map(b => `<option value="${esc(b.bairro)}" ${b.bairro === bairro ? "selected" : ""}>${esc(b.bairro)} (região ${esc(b.region)})</option>`).join("") : "";
+    return (!near ? callout("bad", "A cidade escolhida fica longe de Blumenau. O nível do rio e os avisos são da Defesa Civil de Blumenau.") : "") +
+      sec("Nível do rio Itajaí-Açu",
+        row("Mostrar no painel", "Dados oficiais da Defesa Civil de Blumenau (AlertaBLU), atualizados a cada hora.", toggle("river.show")) +
+        (r ? `<dl class="kv" style="margin:.6em 0 .4em"><dt>Nível</dt><dd>${r.level.toFixed(2).replace(".", ",")} m</dd><dt>Situação</dt><dd>${esc(r.cond.name)}</dd><dt>Última leitura</dt><dd>${new Date(r.last).toLocaleString("pt-BR")}</dd></dl>` : "") +
+        row("Cota de enchente da sua rua", "Altura do rio (em metros) em que a sua rua começa a alagar. O painel desenha essa linha no gráfico e avisa quando o rio chegar perto. Consulte no <b>Mapa de Inundação</b> do site da Defesa Civil de Blumenau. Deixe 0 se não souber.",
+          `<input class="in" type="text" inputmode="decimal" style="max-width:8em" data-bind="river.cota" data-num="1" placeholder="Ex.: 8,5" value="${cota ? String(cota).replace(".", ",") : ""}">`) +
+        `<div class="btns"><button class="btn" data-act="testRiver">${P.ui("refresh-cw")} Atualizar agora</button></div><div id="riverTest" style="margin-top:.8em">${testBox.river || ""}</div>`) +
+      sec("Avisos da Defesa Civil",
+        row("Mostrar avisos", "Condições de chuva e risco de deslizamento, por região de Blumenau. Quando passa de “Atenção”, o painel mostra o aviso em destaque com o telefone 199.", toggle("alerts.show")) +
+        (P.cfg.get("alerts.show") ? row("Seu bairro", "Para mostrar só o que vale para a sua região.",
+          a ? `<select class="sel" data-bind="alerts.bairro" style="max-width:100%"><option value="">Não informar (mostrar a cidade toda)</option>${opts}</select>` : callout("", "Carregando a lista de bairros…"), "col") : "") +
+        (st && st.items.length ? `<dl class="kv" style="margin-top:.8em">${st.items.map(i => `<dt>${esc(i.kind)}</dt><dd>${esc(i.cond)}${st.region ? "" : " (região " + esc(i.region) + ")"}</dd>`).join("")}</dl>` : "")) +
+      sec("Como ler", `<p class="help">Faixas oficiais do rio: <b>Normalidade</b> até 3 m · <b>Observação</b> de 3 a 4 m · <b>Atenção</b> de 4 a 6 m · <b>Alerta</b> de 6 a 8 m · <b>Alerta máximo</b> acima de 8 m. Em emergência, ligue <b>199</b> (Defesa Civil).</p>`);
   }
 
   function tabScreen() {
@@ -217,7 +229,7 @@
     U.$$("[data-bind]", main).forEach(el => {
       if (el.type === "range" || el.tagName === "SELECT" || el.type === "time") return;
       const path = el.dataset.bind; let v = el.value;
-      if (el.dataset.num) v = parseFloat(v);
+      if (el.dataset.num) { v = parseFloat(String(v).replace(",", ".")); if (isNaN(v)) v = 0; }
       if (typeof v === "string") v = v.trim();
       if (P.cfg.get(path) !== v) { P.cfg.set(path, v, true); }
     });
@@ -294,13 +306,14 @@
   function afterSet(path) {
     if (/^calendar\.(mode|daysAhead)/.test(path)) P.cal.refresh();
     if (path === "river.show" && P.cfg.get("river.show")) P.river.refresh();
+    if (path === "alerts.show") P.alerts.refresh();
     if (path === "calendar.mode") testBox.cal = "";
   }
 
   const saveText = U.debounce((el) => {
     const path = el.dataset.bind;
     let v = el.value;
-    if (el.dataset.num) v = parseFloat(v);
+    if (el.dataset.num) { v = parseFloat(String(v).replace(",", ".")); if (isNaN(v)) v = 0; }
     P.cfg.set(path, v);
     afterSet(path);
     if (el.dataset.after === "detect") P.server.detect().then(() => { P.cal.refresh(); P.river.refresh(); });
@@ -316,7 +329,7 @@
       P.cfg.set("reminders", l);
     }
   }
-  function saveNow(el) { const path = el.dataset.bind; let v = el.value; if (el.dataset.num) v = parseFloat(v); P.cfg.set(path, v); afterSet(path); }
+  function saveNow(el) { const path = el.dataset.bind; let v = el.value; if (el.dataset.num) { v = parseFloat(v); if (isNaN(v)) v = 0; } P.cfg.set(path, v); afterSet(path); if (path === "alerts.bairro") render(); }
 
   /* ---------- abrir / fechar ---------- */
   function open(which) {

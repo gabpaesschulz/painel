@@ -1,5 +1,7 @@
 # Pesquisa e decisões de design
 
+> Versão 2 (17/10/2026). O que mudou da v1 para a v2 está na seção **Revisão v2**, no fim.
+
 Público: pessoas idosas, uma delas com baixa visão após AVC isquêmico. Uso: tablet parado, olhada rápida, sem precisar "operar".
 
 ## O que a pesquisa disse (e o que não disse)
@@ -46,3 +48,46 @@ Fonte: [Fully Kiosk — documentação](https://www.fully-kiosk.com/en/)
 | Movimento só na entrada e nos ícones (desligáveis); nada pisca | calma visual |
 | Fontes e ícones empacotados localmente | abre mesmo sem internet |
 | Se a internet cair, mostra o último dado salvo e um aviso discreto | não deixa a tela vazia |
+
+## Revisão v2: de "7" para o máximo possível sem testar com o usuário
+
+### Diagnóstico da v1 (a partir de uma captura do tablet real)
+1. **Estado vazio:** com "Nada marcado", sobrava um buraco de ~350 px no meio da direita. O layout só funcionava com 3 ou 4 compromissos.
+2. **Ícone contradizendo a palavra:** "Nublado" com sol atrás da nuvem; "Neblina" com um sol no horizonte (parece pôr do sol).
+3. **Zero cortado** da Atkinson em horários ("12:00"), onde não há como confundir com a letra O.
+4. **Desequilíbrio:** a esquerda cheia, a direita vazia ou lotada conforme os dados.
+5. **Engrenagem** em cima do cartão do rio.
+6. **Nada memorável** além de bem-feito.
+
+### Pesquisa adicional
+- **Calm technology** (Weiser & Brown; Amber Case): a informação mora na periferia e só vai para o centro quando precisa. O cartão do rio é **calmo quando está normal** (selo discreto) e **toma a frente** a partir de "Atenção" (fundo na cor oficial, frase de ação, telefone 199). [Princípios](https://calmtech.institute/calm-tech-principles) · [Wikipedia](https://en.wikipedia.org/wiki/Calm_technology)
+- **Glanceability** (Matthews, Forlizzi e Rohrbach, Berkeley): baixo esforço para captar; abstração e níveis de notificação (de "ignorar" a "exigir ação"). Daí os níveis de destaque explícitos no rio e na Defesa Civil. [Relatório 2006](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2006/EECS-2006-113.pdf)
+- **StandBy da Apple:** só o que se lê de longe, com tipografia aumentada. [WidgetKit](https://developer.apple.com/tutorials/data/documentation/widgetkit/adding-standby-and-carplay-support-to-your-widget.md)
+- **Relógios de orientação (idosos, demência):** "agora é domingo de manhã", o período do dia em palavras. A evidência é de fabricantes, não de ensaios. Daí a previsão em **períodos** ("Agora · Tarde", "Hoje · Noite", "Amanhã · Manhã"). [Alzheimer's Society](https://shop.alzheimers.org.uk/products/dual-display-dementia-day-clock)
+- **Comunicação de cheias** (NWS/EUA, Environment Agency/Reino Unido, Emilia-Romagna, Tailândia): poucas faixas de cor ligadas a **limiares com nome e a uma ação**, limiares desenhados no próprio gráfico, tendência das últimas horas. Daí o gráfico de 24 h com as faixas oficiais na régua, a frase de ação por nível e a **cota da rua** opcional. [NWS](https://www.weather.gov/media/water/brochures/Guide_to_Hydrologic_Information_Brochure.pdf) · [riverlevels.uk](https://riverlevels.uk/pages/symbols) · [Emilia-Romagna](https://allertameteo.regione.emilia-romagna.it/documents/d/guest/Livelli_idro_ENG) · [Tailândia](https://www.nationthailand.com/news/general/40070222)
+- **Envelhecimento e cor:** o cristalino amarela com a idade; azuis, verdes e violetas se confundem, e tons quentes e saturados se distinguem melhor. O destaque quente (âmbar) ficou; a cor nunca é a única pista (sempre palavra e ícone junto). [GerontoVis](https://arxiv.org/pdf/2403.13173)
+- **Hemianopia:** a do lado direito atrapalha mais a leitura dentro da linha; a do esquerdo, achar o começo da linha. Títulos curtos com começo de linha fixo; o "lado do relógio" continua configurável. [PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC7510370/)
+- **Estado vazio** (SAP Fiori, Cloudscape, NN/g): dizer **o quê, por quê e o que fazer**. Daí "Semana livre / Nenhum compromisso nos próximos 7 dias / Para marcar, diga: 'Alexa, adicione…'". [SAP](https://www.sap.com/design-system/fiori-design-web/v1-96/foundations/best-practices/global-patterns/designing-for-empty-states) · [Cloudscape](https://cloudscape.design/patterns/general/empty-states/)
+- **Dados da Defesa Civil:** além do rio, o AlertaBLU publica **condições de chuva** e **risco de deslizamento** por região (Central, Norte, Sul, Leste, Oeste, com a lista de bairros). Daí os avisos por bairro.
+
+### O que mudou
+| Problema | Solução |
+|---|---|
+| Buraco no meio | O cartão da agenda **ocupa todo o espaço livre**; a lista cresce até preencher. Estado vazio útil. |
+| Ícone × palavra | Mapa revisado: Nublado = só nuvens; Neblina = neblina; Chuva = chuva (sem sol). "Pancadas" mantêm sol e chuva, que é o que a palavra diz. |
+| Zero cortado | Todo número usa a fonte de números (Fraunces, Literata ou Lexend), inclusive dentro de frases. |
+| Equilíbrio | Esquerda = **agora** (hora, tempo, próximas horas); direita = **o que vem** (semana, agenda, rio). As duas colunas terminam na mesma linha. |
+| Engrenagem | No cabeçalho da agenda, no fluxo da página; nada flutua por cima do conteúdo. O aviso de conexão também foi para o cabeçalho. |
+| Momento memorável | **Gráfico do rio nas últimas 24 h** com as faixas oficiais e a cota da rua; **faixa da semana com o tempo de cada dia**; frase que responde "preciso de guarda-chuva?". |
+| Máx/mín confusa | Períodos com nome ("Hoje · Noite 15°"): de dia, a máxima do período; à noite, a mínima. Sem rótulos técnicos. |
+| Avisos | Defesa Civil por bairro. A partir de "Alerta", o painel não entra em descanso; o aviso aparece também na tela de descanso. |
+| Feriados | Nacionais e o aniversário de Blumenau, com estrela na faixa da semana e embaixo da data. |
+| Um dia da semana | Tocar no dia mostra os compromissos **e** o tempo de manhã, tarde e noite daquele dia. |
+| Descanso | Sempre escuro com letras âmbar (menos luz azul à noite), em qualquer tema. |
+| Letras grandes, telas pequenas | Ordem de sacrifício explícita: tempo na faixa, gráfico do rio, faixa da semana, rio (nunca em alerta). As colunas da lista crescem junto com o texto. |
+| Previsão velha (tablet sem internet) | A previsão é casada pela **data**, não pela posição; se ficar velha, a frase e a máx/mín somem em vez de mostrar o dia errado. |
+
+### Ainda não validado (o que impede o "10")
+- Nenhuma decisão foi testada com os usuários finais. O passo de maior valor agora é observar o uso por alguns dias e anotar onde eles hesitam.
+- A cota de enchente da rua depende de alguém saber o número (Mapa de Inundação da Defesa Civil).
+- A Defesa Civil não publica previsão do nível do rio em formato aberto; o gráfico mostra só o que já aconteceu.

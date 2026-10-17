@@ -1,13 +1,14 @@
 # Painel
 
-Painel de casa para um tablet parado: **hora, tempo, agenda da semana e nível do rio Itajaí-Açu**, em letras grandes e de contraste alto, pensado para pessoas idosas e com baixa visão. Tudo é configurável na própria tela (tema, letras, cidade, Google Agenda, lembretes, descanso).
+Painel de casa para um tablet parado: **hora, tempo, agenda da semana, nível do rio Itajaí-Açu e avisos da Defesa Civil**, em letras grandes e de contraste alto, pensado para pessoas idosas e com baixa visão. Tudo é configurável na própria tela (tema, letras, cidade, Google Agenda, lembretes, descanso).
 
 ```
 painel/
 ├─ public/            ← o painel (é isto que vai para o tablet)
 │  ├─ index.html, css/, js/, assets/ (fontes, ícones), vendor/
 │  ├─ deploy.json     ← endereço do servidor e padrões do primeiro uso
-│  └─ river.json      ← cópia do nível do rio (renovada automaticamente)
+│  ├─ river.json      ← cópia do nível do rio (renovada a cada 15 min)
+│  └─ alerts.json     ← cópia dos avisos da Defesa Civil (renovada a cada 15 min)
 ├─ worker/index.js    ← servidor gratuito (Cloudflare) que libera o Google Agenda
 ├─ tools/             ← servidor local, testes e verificação de contraste
 ├─ .github/workflows/ ← publica no GitHub Pages e renova o rio a cada 15 min
@@ -26,7 +27,7 @@ O tablet precisa abrir o painel por um endereço na internet. São duas peças g
 
 | Peça | Para quê | Onde |
 |---|---|---|
-| **Site** (GitHub Pages) | hospeda o painel e renova o nível do rio a cada 15 min | GitHub |
+| **Site** (GitHub Pages) | hospeda o painel e renova o nível do rio e os avisos a cada 15 min | GitHub |
 | **Servidor da agenda** (Cloudflare Worker) | deixa o painel ler o seu Google Agenda | Cloudflare |
 
 ### 2.1 Site no GitHub Pages
@@ -58,26 +59,26 @@ Com isso, tudo que a Alexa adicionar na agenda ("Alexa, adicione dentista na qui
 
 *Alternativa:* "Agenda pública" (e-mail da agenda + chave de API do Google). É mais simples, mas qualquer pessoa com o link vê seus compromissos. O login "Entrar com Google" não foi usado de propósito: o Google bloqueia login dentro de WebView e a sessão expira em 1 hora, ruim para um painel sempre ligado.
 
-## 4. Tablet com Fully Kiosk Browser (recomendado)
+## 4. Tablet com Fully Kiosk Browser
 
-Instale o **Fully Kiosk Browser** (versão PLUS para movimento e interface JavaScript). Os nomes das opções podem variar um pouco conforme a versão:
+Instale o **Fully Kiosk Browser** (a versão grátis basta). Os nomes das opções podem variar um pouco conforme a versão:
 
 - **Web Content Settings → Start URL:** o endereço do painel.
-- **Kiosk Mode / Device Management:** ligue o modo quiosque; **Keep Screen On** ligado.
-- **Motion Detection (PLUS):** *Enable Visual Motion Detection* e *Turn Screen On on Motion* (a tela acende quando alguém passa na frente).
-- **Advanced Web Settings → Enable JavaScript Interface:** o painel passa a acordar do descanso quando o Fully vê movimento. (Ligue só para sites em que você confia.)
-- Se quiser que o tablet **apague a tela** no descanso: ligue em **Configurações → Tela → Apagar a tela do tablet no descanso** e use o **Screen Off Timer** do Fully.
-- Toque na tela também acorda.
+- **Fullscreen Mode** ligado; **Show Action Bar** e **Show Address Bar** desligados.
+- **Device Management → Keep Screen On** ligado.
+- Para pegar uma versão nova do painel: deslize da borda esquerda → **Load Start URL**.
+
+Opcional, com licença PLUS (paga): *Motion Detection* acende a tela quando alguém passa, e *Enable JavaScript Interface* faz o painel sair do descanso junto. Sem isso, um toque na tela acorda.
 
 Sem Fully, abra no Chrome → ⋮ → **Adicionar à tela inicial** (abre em tela cheia). O painel pede ao navegador para manter a tela ligada.
 
 ## 5. Configurações (segure a engrenagem 1 s)
 
 - **Aparência:** 5 temas (Noite, Papel, Alto contraste, Oceano, Floresta), 4 combinações de letra, tamanho das letras, lado do relógio (útil para perda de visão de um lado), 24 h, nome na saudação, ícones animados, modo leve.
-- **Cidade e tempo:** busca de cidade, próximos dias ou manhã/tarde/noite, frase amiga ("leve o guarda-chuva").
-- **Agenda:** Google Agenda e teste de conexão.
+- **Cidade e tempo:** busca de cidade, próximas horas (agora, hoje à noite, amanhã…) ou próximos dias, frase amiga ("leve o guarda-chuva"), tempo na faixa da semana.
+- **Agenda:** Google Agenda, teste de conexão e feriados.
 - **Lembretes:** remédios e rotinas diárias, sem precisar do Google.
-- **Rio:** liga/desliga o nível do Itajaí-Açu (dados oficiais da Defesa Civil de Blumenau).
+- **Rio e Defesa Civil:** nível do Itajaí-Açu, **cota de enchente da sua rua** (o painel desenha a linha no gráfico e avisa quando o rio chega perto) e avisos de chuva e deslizamento **do seu bairro**.
 - **Tela:** descanso, modo noite, integração com o Fully Kiosk.
 - **Avançado:** endereço do servidor, copiar configurações para outro aparelho (código), voltar ao padrão.
 
@@ -91,8 +92,9 @@ node tools/make-fixture.js    # gera uma agenda de teste com datas de hoje
 
 ## 7. O que foi e o que não foi testado
 
-- Testado: interface em 5 temas, telas 4:3, 16:10, 16:9 e 2:1; letras grandes e layout espelhado; modo descanso; configurações (busca de cidade, lembretes, código, tema/fonte); leitura de agenda `.ics` (fuso, dia inteiro, repetições) ponta a ponta através do servidor; Worker localmente (`wrangler dev`): ping, trava de segurança e arquivos.
-- **Não testado:** em um tablet de verdade; o Worker no ar na Cloudflare; o Google Agenda real (usei um `.ics` equivalente); os eventos do Fully Kiosk (`onMotion` etc. seguem a documentação oficial).
+- **Testado com capturas automáticas:** 5 temas; telas 16:10, 2:1 e 4:3; letras A+++ com layout espelhado; manhã, noite e madrugada; dia escolhido na faixa da semana; agenda vazia; feriado hoje e amanhã; compromisso em andamento; títulos longos; rio em "Atenção" e "Alerta máximo" com a cota da rua; avisos de deslizamento por bairro; descanso com e sem alerta; configurações (bairro, cota com vírgula, cidade). Leitor de agenda `.ics` e contraste de todos os temas por script.
+- **Testado no uso real:** site no GitHub Pages, servidor na Cloudflare, Google Agenda pelo endereço secreto, Fully Kiosk no tablet.
+- **Não testado:** com os usuários finais; o painel numa cheia de verdade (os alertas foram simulados alterando os dados oficiais); os eventos de movimento do Fully (exigem a licença PLUS).
 - O nível do rio depende do que a Defesa Civil publica. Se a leitura ficar com mais de 3 horas, o painel avisa "Dado antigo".
 
 ## Créditos

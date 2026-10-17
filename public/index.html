@@ -10,6 +10,8 @@
 <title>Painel</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/fraunces-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/atkinson-next-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/themes.css">
 <link rel="stylesheet" href="css/app.css">
@@ -20,43 +22,45 @@
 
 <main class="app" id="app" data-side="left">
 
-  <section class="side side-a">
-    <header class="hero rise" style="animation-delay:.05s">
+  <!-- AGORA: hora, dia, tempo -->
+  <section class="side side-a" id="sideA">
+    <header class="hero rise" style="--d:.05s">
       <div class="kicker" id="greet">Bom dia</div>
-      <div class="time" id="time">--:--</div>
+      <div class="time" id="time" aria-live="off">--:--</div>
       <div class="date" id="date"></div>
+      <div class="holiday" id="todayHoliday" hidden></div>
     </header>
 
     <div class="rule"></div>
-    <section class="wx-now rise" id="wxNow" style="animation-delay:.2s"></section>
-    <div id="wxHint" class="rise" style="animation-delay:.28s"></div>
+    <section class="now rise" id="wxNow" style="--d:.15s"></section>
+    <div class="hint-slot rise" id="wxHint" style="--d:.22s"></div>
 
-    <div class="rule"></div>
-    <section class="wx-more rise" id="wxMore" style="animation-delay:.35s"></section>
+    <div class="rule" id="aheadRule"></div>
+    <section class="ahead rise" id="wxAhead" style="--d:.3s"></section>
   </section>
 
-  <section class="side side-b">
-    <div class="head rise" style="animation-delay:.1s">
+  <!-- AGENDA, SEMANA E SEGURANÇA -->
+  <section class="side side-b" id="sideB">
+    <header class="bar rise" style="--d:.08s">
       <div class="kicker">Meus compromissos</div>
-      <div class="note" id="agendaNote"></div>
-    </div>
-    <div class="week rise" id="week" style="animation-delay:.16s"></div>
-    <article class="panel feature rise" id="feature" style="animation-delay:.24s"></article>
-    <div class="later rise" id="later" style="animation-delay:.32s"></div>
-    <section class="panel river rise" id="river" style="animation-delay:.42s"></section>
+      <div class="bar-end">
+        <div class="status" id="status" hidden></div>
+        <div class="note" id="agendaNote"></div>
+        <button id="gear" aria-label="Configurações (segure por 1 segundo)">
+          <svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="36"/></svg>
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+        </button>
+      </div>
+    </header>
+    <nav class="week rise" id="week" style="--d:.14s" aria-label="Semana"></nav>
+    <section class="panel agenda rise" id="agenda" style="--d:.2s"></section>
+    <section class="panel safety rise" id="safety" style="--d:.28s"></section>
   </section>
 
 </main>
 
-<div id="status" hidden></div>
-
-<button id="gear" aria-label="Configurações (segure por 1 segundo)">
-  <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
-  <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
-</button>
-
 <div id="rest" hidden>
-  <div class="ri"><div class="rt"></div><div class="rd"></div><div class="rn"></div></div>
+  <div class="ri"><div class="ra" id="restAlert"></div><div class="rt"></div><div class="rd"></div><div class="rn"></div></div>
 </div>
 
 <div id="settings" hidden></div>
@@ -73,7 +77,6 @@
 <script src="js/kiosk.js"></script>
 <script src="js/settings.js"></script>
 <script>
-  // ícone da engrenagem (a mesma da lista de ícones embutidos)
   document.querySelector("#gear svg.ic").innerHTML = (window.UI_ICONS || {}).settings || "";
 </script>
 <script src="js/main.js"></script>

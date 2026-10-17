@@ -1,4 +1,4 @@
-# Publica o painel no GitHub Pages e renova a cópia do nível do rio a cada 15 minutos.
+# Publica o painel no GitHub Pages e renova a cópia do nível do rio e dos avisos da Defesa Civil a cada 15 minutos.
 # (O servidor da Defesa Civil não deixa o navegador — nem o Cloudflare — lerem direto, por isso esta cópia.)
 name: Publicar painel
 
@@ -34,6 +34,15 @@ jobs:
             echo "river.json atualizado"
           else
             echo "::warning::não consegui baixar o rio; mantendo a cópia anterior"
+          fi
+      - name: Baixar avisos da Defesa Civil (chuva e deslizamento, por região)
+        run: |
+          if curl -fsSk -m 30 "https://defesacivil.blumenau.sc.gov.br/static/data/situacao_atual.json?a=$RANDOM" -o /tmp/alerts.json \
+             && python3 -c "import json;d=json.load(open('/tmp/alerts.json'));assert d['dados']"; then
+            cp /tmp/alerts.json public/alerts.json
+            echo "alerts.json atualizado"
+          else
+            echo "::warning::não consegui baixar os avisos; mantendo a cópia anterior"
           fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

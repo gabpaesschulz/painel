@@ -25,10 +25,14 @@
     clock24: true,
     showSeconds: false,
     city: { name: "Blumenau", region: "Santa Catarina", lat: -26.9194, lon: -49.0661, tz: "America/Sao_Paulo" },
-    weatherMode: "dias",       // dias | periodos
-    forecastDays: 2,           // 1..3
+    v: 2,                      // versão das configurações (para migrar as antigas)
+    weatherMode: "horas",      // horas (agora, depois, amanhã…) | dias
+    forecastDays: 2,           // 1..3 (modo "dias")
     hint: true,                // frase amigável (guarda-chuva, agasalho…)
-    river: { show: true },
+    weekWeather: true,         // tempo de cada dia na faixa da semana
+    holidays: true,            // feriados nacionais (e o aniversário de Blumenau)
+    river: { show: true, cota: 0 },          // cota = altura (m) em que a rua da casa alaga; 0 = não informada
+    alerts: { show: true, bairro: "" },      // avisos da Defesa Civil de Blumenau para o bairro
     calendar: { mode: "demo", icsUrl: "", calId: "", apiKey: "", daysAhead: 7, laterCount: 3 },
     reminders: [],             // { id, time:"08:00", text, days:[0..6] }
     rest: { idleMin: 10, night: true, nightStart: "22:00", nightEnd: "06:00", dim: 0.4, screenOff: false },
@@ -49,8 +53,13 @@
   }
 
   let state;
+  function migrate(saved) {
+    // v1 → v2: o modo "próximos dias" era o padrão; o novo padrão é "próximas horas"
+    if (saved && !saved.v) { saved.weatherMode = "horas"; saved.v = 2; }
+    return saved;
+  }
   function load() {
-    try { state = merge(clone(DEFAULTS), JSON.parse(localStorage.getItem(KEY) || "{}")); }
+    try { state = merge(clone(DEFAULTS), migrate(JSON.parse(localStorage.getItem(KEY) || "{}"))); }
     catch (e) { state = clone(DEFAULTS); }
   }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* modo privado */ } }
@@ -72,7 +81,7 @@
     exportCode() { return "PNL1." + btoa(unescape(encodeURIComponent(JSON.stringify(state)))); },
     importCode(code) {
       const raw = String(code || "").trim().replace(/^PNL1\./, "");
-      const obj = JSON.parse(decodeURIComponent(escape(atob(raw))));
+      const obj = migrate(JSON.parse(decodeURIComponent(escape(atob(raw)))));
       state = merge(clone(DEFAULTS), obj);
       P.cfg.isFirstRun = false;
       persist(); P.bus.emit("cfg", "*");
@@ -127,6 +136,8 @@
     const wd = date.toLocaleDateString("pt-BR", { weekday: short ? "short" : "long" }).replace("-feira", "").replace(".", "");
     return wd + " " + date.getDate();
   };
+  /** Coloca os algarismos de um texto na fonte de números (a fonte de texto tem zero cortado) */
+  U.nums = s => U.esc(s).replace(/\d+(?:[:,.]\d+)*/g, m => `<span class="num">${m}</span>`);
   U.parseHM = s => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? [+m[1], +m[2]] : [0, 0]; };
 
   /** fetch com limite de tempo */

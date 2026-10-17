@@ -1,17 +1,18 @@
-/* Tela principal: relógio, tempo, agenda, rio. */
+/* Tela principal: hora e tempo (lado "agora"), semana, agenda e rio/Defesa Civil (lado "agenda"). */
 (function () {
   "use strict";
-  const P = window.P, U = P.util, $ = U.$;
+  const P = window.P, U = P.util;
   const html = document.documentElement;
   const el = {};
-  const round = n => Math.round(n);
+  const r0 = n => Math.round(n);
+  const N = s => `<span class="num">${s}</span>`;                       // número na fonte de números
 
   function grab() {
-    ["app", "greet", "time", "date", "wxNow", "wxHint", "wxMore", "week", "feature", "later", "river", "agendaNote", "status", "wxRule"]
-      .forEach(id => { el[id] = document.getElementById(id); });
+    ["app", "sideA", "sideB", "greet", "time", "date", "todayHoliday", "wxNow", "wxHint", "aheadRule", "wxAhead",
+      "week", "agenda", "safety", "agendaNote", "status"].forEach(id => { el[id] = document.getElementById(id); });
   }
 
-  /* ---------- aparência (tema, fonte, tamanho…) ---------- */
+  /* ---------- aparência ---------- */
   function applyLook() {
     const c = P.cfg.all();
     html.dataset.theme = c.theme;
@@ -26,7 +27,7 @@
     if (meta) meta.content = getComputedStyle(html).getPropertyValue("--bg").trim() || "#000";
   }
 
-  function skyFor(h) { return h >= 5 && h < 8 ? "dawn" : h >= 8 && h < 17 ? "day" : h >= 17 && h < 20 ? "dusk" : "night"; }
+  const skyFor = h => (h >= 5 && h < 8 ? "dawn" : h >= 8 && h < 17 ? "day" : h >= 17 && h < 20 ? "dusk" : "night");
   function isNight(now) {
     const r = P.cfg.get("rest");
     if (!r.night) return false;
@@ -34,14 +35,29 @@
     const m = now.getHours() * 60 + now.getMinutes(), s = sh * 60 + sm, e = eh * 60 + em;
     return s <= e ? m >= s && m < e : m >= s || m < e;
   }
-  P.view = { isNight };
 
-  /* ---------- relógio ---------- */
+  /** "Quinta-feira, 22 de outubro" / "Hoje" / "Amanhã" */
+  function longDay(d) {
+    const diff = U.dayDiff(d);
+    if (diff === 0) return "Hoje";
+    if (diff === 1) return "Amanhã";
+    return U.cap(d.toLocaleDateString("pt-BR", { weekday: "long" })) + ", " + d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+  }
+  /** hora com os dois-pontos mais leves e um pouco erguidos (como nos relógios bem desenhados) */
+  function clockHTML(d) {
+    const t = U.fmtTime(d);
+    const [h, m] = t.split(":");
+    return `${h}<span class="colon">:</span>${m}`;
+  }
+  P.view = { isNight, clockHTML, longDay };
+
+  /* =====================================================================
+     RELÓGIO
+     ===================================================================== */
   let lastTime = "", lastMinute = -1;
   function tick() {
-    const now = new Date();
-    const c = P.cfg.all();
-    let t = U.fmtTime(now);
+    const now = new Date(), c = P.cfg.all();
+    let t = clockHTML(now);
     if (!c.clock24) t += `<span class="ampm">${now.getHours() < 12 ? "AM" : "PM"}</span>`;
     if (c.showSeconds) t += `<span class="sec">${U.pad(now.getSeconds())}</span>`;
     if (t !== lastTime) { el.time.innerHTML = t; lastTime = t; }
@@ -51,225 +67,393 @@
     const h = now.getHours(), c = P.cfg.all();
     const g = h < 5 ? "Boa madrugada" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
     el.greet.textContent = c.name ? `${g}, ${c.name}` : g;
-    const wd = now.toLocaleDateString("pt-BR", { weekday: "long" });
-    el.date.innerHTML = `<b>${U.cap(wd)}</b>, ${now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}`;
+    el.date.innerHTML = `<b>${U.cap(now.toLocaleDateString("pt-BR", { weekday: "long" }))}</b>, ${U.nums(now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" }))}`;
+    const hol = P.holidays(U.startOfDay(now), U.addDays(U.startOfDay(now), 1))[0];
+    el.todayHoliday.hidden = !hol;
+    if (hol) el.todayHoliday.innerHTML = P.ui("star") + `<span>Feriado: ${U.esc(hol.title)}</span>`;
     html.dataset.sky = skyFor(h);
     html.dataset.night = isNight(now) ? "1" : "0";
-    document.body.dataset.night = html.dataset.night;
-    renderAgenda();            // atualiza "daqui a 2 horas", dia da semana, etc.
-    renderWeatherPeriods();
-    fitSides();
+    renderAhead(); renderSafety();
+    layout();
     P.bus.emit("minute", now);
   }
 
-  /* ---------- tempo ---------- */
-  function renderWeather() {
+  /* =====================================================================
+     TEMPO
+     ===================================================================== */
+  function renderNow() {
     const w = P.data.weather;
-    if (!w) { el.wxNow.innerHTML = `<div class="wx-txt skel"><div class="temp">--°</div><div class="desc">Carregando…</div></div>`; el.wxHint.innerHTML = ""; el.wxMore.innerHTML = ""; return; }
-    const info = P.wmo(w.now.code, w.now.isDay);
-    const feelsDiff = Math.abs(w.now.feels - w.now.temp) >= 3;
+    if (!w) {
+      el.wxNow.className = "now loading";
+      el.wxNow.innerHTML = `<div class="ico"></div><div><div class="temp disp">--°</div><div class="desc">Buscando a previsão…</div></div>`;
+      el.wxHint.innerHTML = "";
+      return;
+    }
+    el.wxNow.className = "now";
+    const info = P.wmo(w.now.code, w.now.isDay), today = P.weather.day(w, new Date());
+    const feels = Math.abs(w.now.feels - w.now.temp) >= 3 ? `<div class="feels">Sensação de ${N(r0(w.now.feels) + "°")}</div>` : "";
+    const range = today ? `<div class="range"><span class="mx">Máx ${N(r0(today.max) + "°")}</span> · <span class="mn">Mín ${N(r0(today.min) + "°")}</span></div>` : "";
     el.wxNow.innerHTML =
-      `<div class="wx-ico">${P.wxImg(info.icon)}</div>` +
-      `<div class="wx-txt"><div class="temp">${round(w.now.temp)}°</div><div class="desc">${info.text}</div>` +
-      `<div class="range"><span class="mx">Máx ${round(w.today.max)}°</span> · <span class="mn">Mín ${round(w.today.min)}°</span></div>` +
-      (feelsDiff ? `<div class="feels">Sensação de ${round(w.now.feels)}°</div>` : "") + `</div>`;
-
+      `<div class="ico">${P.wxImg(info.icon)}</div>` +
+      `<div><div class="temp disp">${r0(w.now.temp)}°</div><div class="desc">${info.text}</div>${range}${feels}</div>`;
     const h = P.cfg.get("hint") ? P.weather.hint(w) : null;
-    el.wxHint.innerHTML = h ? `<div class="hint">${P.wxImg(h.icon, "hi")}<span>${U.esc(h.text)}</span></div>` : "";
-
-    if (P.cfg.get("weatherMode") === "periodos") renderWeatherPeriods();
-    else renderWeatherDays();
+    el.wxHint.innerHTML = h ? `<div class="hint ${h.ui ? "calm" : ""}">${h.ui ? P.ui(h.ui, "hu") : P.wxImg(h.icon, "hi")}<span>${U.nums(h.text)}</span></div>` : "";
   }
 
-  function renderWeatherDays() {
-    const w = P.data.weather; if (!w) return;
-    const n = P.cfg.get("forecastDays");
-    el.wxMore.innerHTML = w.days.slice(0, n).map((d, i) => {
-      const dt = new Date(d.date + "T12:00");
-      const name = i === 0 ? "Amanhã" : dt.toLocaleDateString("pt-BR", { weekday: "long" }).replace("-feira", "");
-      const info = P.wmo(d.code, true);
-      return `<div class="day"><div class="who">${name}<small>${d.pop >= 30 ? "Chuva: " + d.pop + "%" : info.text}</small></div>` +
-        P.wxImg(info.icon, "wi di") +
-        `<div class="mm"><div class="mx">Máx ${round(d.max)}°</div><div class="mn">Mín ${round(d.min)}°</div></div></div>`;
-    }).join("");
-    fit(el.wxMore);
-  }
-
-  function renderWeatherPeriods() {
+  function renderAhead() {
     const w = P.data.weather;
-    if (!w || P.cfg.get("weatherMode") !== "periodos") return;
-    const h = new Date().getHours();
-    el.wxMore.innerHTML = `<div class="periods">` + w.periods.map(p => {
-      const cls = h >= p.from && h <= p.to ? "now" : h > p.to ? "past" : "";
-      const info = P.wmo(p.code, p.id !== "noite");
-      return `<div class="period ${cls}"><div class="pl">${p.label}</div>${P.wxImg(info.icon, "wi pi")}` +
-        `<div class="pt">${round(p.temp)}°</div><div class="pr">${p.pop >= 30 ? "Chuva " + p.pop + "%" : "&nbsp;"}</div></div>`;
+    if (!w) { el.wxAhead.innerHTML = ""; return; }
+    if (P.cfg.get("weatherMode") === "dias") {
+      const list = [];
+      for (let i = 1; i <= P.cfg.get("forecastDays"); i++) { const d = P.weather.day(w, U.addDays(new Date(), i)); if (d) list.push(d); }
+      el.aheadRule.hidden = !list.length;
+      el.wxAhead.innerHTML = `<div class="days">` + list.map((d, i) => {
+        const dt = new Date(d.date + "T12:00"), info = P.wmo(d.code, true);
+        const name = i === 0 ? "Amanhã" : dt.toLocaleDateString("pt-BR", { weekday: "long" }).replace("-feira", "");
+        return `<div class="dayrow"><div class="who">${name}<small>${d.pop >= 30 ? "Chuva: " + N(d.pop + "%") : info.text}</small></div>` +
+          P.wxImg(info.icon, "wi di") +
+          `<div class="mm"><div class="mx">Máx ${N(r0(d.max) + "°")}</div><div class="mn">Mín ${N(r0(d.min) + "°")}</div></div></div>`;
+      }).join("") + `</div>`;
+      return;
+    }
+    const per = P.weather.periods(w, 4);
+    el.aheadRule.hidden = !per.length;
+    el.wxAhead.innerHTML = `<div class="tiles">` + per.map(p => {
+      const info = P.wmo(p.code, !p.night);
+      const rain = p.pop >= 20 ? P.ui("droplet") + N(p.pop + "%") : "";
+      return `<div class="tile ${p.isNow ? "is-now" : ""}"><div class="k">${p.kicker}</div><div class="l">${p.label}</div>` +
+        P.wxImg(info.icon, "wi ti") + `<div class="tt disp">${r0(p.temp)}°</div><div class="tr">${rain}</div></div>`;
     }).join("") + `</div>`;
   }
 
-  /** Remove itens que não cabem (telas menores / letras maiores) em vez de cortar no meio */
-  function fit(box) {
-    let guard = 12;
-    while (box.scrollHeight > box.clientHeight + 1 && box.children.length > 1 && guard--) box.removeChild(box.lastElementChild);
-  }
-
-  /** Prioridade quando falta espaço (tela pequena ou letras grandes).
-      1) esconde o menos importante até caber; 2) tenta devolver o que couber, do mais para o menos importante.
-      Nunca somem: relógio, tempo agora e próximo compromisso. O rio só some em último caso. */
-  function fitSides() {
-    const sides = [
-      [document.querySelector(".side-b"), [el.agendaNote, el.later, el.week, el.river]],   // do menos ao mais importante
-      [document.querySelector(".side-a"), [el.wxMore, el.wxHint]],
-    ];
-    const over = side => side.scrollHeight > side.clientHeight + 1;
-    for (const [side, order] of sides) {
-      order.forEach(n => { if (n) n.classList.remove("squeezed"); });
-      for (const n of order) {
-        if (!n || n.hidden) continue;
-        if (over(side) || (n === el.wxMore && n.scrollHeight > n.clientHeight + 1)) n.classList.add("squeezed");
-      }
-      // devolve o que couber (do mais importante para o menos)
-      for (const n of order.slice().reverse()) {
-        if (!n || n.hidden || !n.classList.contains("squeezed")) continue;
-        n.classList.remove("squeezed");
-        if (n === el.later) fit(el.later);
-        const clipped = (n === el.later || n === el.wxMore) && n.scrollHeight > n.clientHeight + 1;
-        if (over(side) || clipped) n.classList.add("squeezed");
-      }
-    }
-  }
-
-  /* ---------- agenda ---------- */
-  let selDay = 0, selTimer = null;       // 0 = hoje (visão normal); 1..6 = dia escolhido na faixa da semana
+  /* =====================================================================
+     SEMANA
+     ===================================================================== */
+  let selDay = 0, selTimer = null;            // 0 = hoje (visão normal); 1..6 = dia escolhido
   function selectDay(i) {
     selDay = i === selDay ? 0 : i;
     clearTimeout(selTimer);
-    if (selDay) selTimer = setTimeout(() => { selDay = 0; renderAgenda(); }, 45000);   // volta sozinho para hoje
-    renderAgenda();
-    fitSides();
+    if (selDay) selTimer = setTimeout(() => { selDay = 0; layout(); }, 45000);
+    layout();
   }
-  P.view.resetDay = () => { if (selDay) { selDay = 0; clearTimeout(selTimer); renderAgenda(); fitSides(); } };
-
-  function renderDayView(list) {
-    const base = U.startOfDay(new Date()), day = U.addDays(base, selDay), next = U.addDays(day, 1);
-    const evs = list.filter(e => e.start < next && e.end > day);
-    const wd = U.cap(day.toLocaleDateString("pt-BR", { weekday: "long" }));
-    const full = day.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
-    const shown = evs.slice(0, 4);
-    el.feature.classList.remove("now-on");
-    el.feature.classList.add("dayview");
-    el.feature.innerHTML =
-      `<div class="ft dv"><div class="dvw">${day.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</div><div class="dvn">${day.getDate()}</div></div>` +
-      `<div class="fb"><div class="fl">${wd}, ${full}</div>` +
-      (shown.length
-        ? shown.map(e => `<div class="dvrow"><span class="t">${e.allDay ? "Dia todo" : U.fmtTime(e.start)}</span><span class="n">${e.kind === "reminder" ? P.ui("bell", "bell") : ""}${U.esc(e.title)}</span></div>`).join("") +
-          (evs.length > shown.length ? `<div class="fs">e mais ${evs.length - shown.length}</div>` : "")
-        : `<div class="fn">Nada marcado</div>`) +
-      `<div class="fs back">Toque em “hoje” para voltar</div></div>`;
-    el.later.innerHTML = "";
-  }
-
-  function countdown(ev) {
-    const now = new Date();
-    if (ev.start <= now) return "Acontecendo agora";
-    const min = Math.round((ev.start - now) / 60000);
-    if (min < 60) return `Daqui a ${min} ${min === 1 ? "minuto" : "minutos"}`;
-    if (U.sameDay(ev.start, now)) { const h = Math.round(min / 60); return `Daqui a ${h} ${h === 1 ? "hora" : "horas"}`; }
-    return "";
-  }
+  P.view.resetDay = () => { if (selDay) { selDay = 0; clearTimeout(selTimer); layout(); } };
 
   function renderWeek() {
-    const counts = P.cal.countsByDay(7), base = U.startOfDay(new Date());
-    el.week.innerHTML = Array.from({ length: 7 }, (_, i) => {
-      const d = U.addDays(base, i);
-      const n = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
-      const cls = (i === 0 ? "today " : "") + (i === selDay && i > 0 ? "sel" : "");
-      return `<button class="wd ${cls}" data-i="${i}" aria-label="${U.esc(d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }))}">` +
-        `<div class="n">${n}</div><div class="d">${d.getDate()}</div>` +
-        `<div class="dots">${"<i></i>".repeat(Math.min(3, counts[i] || 0))}</div></button>`;
+    const info = P.cal.byDay(7), base = U.startOfDay(new Date()), w = P.data.weather;
+    const showWx = P.cfg.get("weekWeather") && w;
+    el.week.classList.toggle("no-wx", !showWx);
+    el.week.innerHTML = info.map((d, i) => {
+      const day = U.addDays(base, i);
+      const wd = P.weather.day(w, day);
+      const wx = showWx && wd ? P.wxImg(P.wmo(wd.code, true).icon) + N(r0(wd.max) + "°") : "";
+      const marks = (d.holiday ? P.ui("star") : "") + "<i></i>".repeat(Math.min(3, d.count));
+      const label = day.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) +
+        (d.count ? `, ${d.count} compromisso${d.count > 1 ? "s" : ""}` : "") + (d.holiday ? `, feriado: ${d.holiday}` : "");
+      return `<button class="wd ${i === 0 ? "today" : ""} ${i === selDay && i > 0 ? "sel" : ""}" data-i="${i}" aria-label="${U.esc(label)}">` +
+        `<span class="n">${day.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</span>` +
+        `<span class="d disp">${day.getDate()}</span><span class="wx">${wx}</span><span class="marks">${marks}</span></button>`;
     }).join("");
   }
+
+  /* =====================================================================
+     AGENDA
+     ===================================================================== */
+  function countdown(ev) {
+    const now = new Date();
+    if (ev.start <= now) return ev.end - ev.start >= 20 * 60000 ? `acontecendo agora, até ${U.fmtTime(ev.end)}` : "acontecendo agora";
+    const min = Math.round((ev.start - now) / 60000);
+    if (min < 60) return `daqui a ${min} ${min === 1 ? "minuto" : "minutos"}`;
+    if (U.sameDay(ev.start, now)) { const h = Math.round(min / 60); return `daqui a ${h} ${h === 1 ? "hora" : "horas"}`; }
+    return "";
+  }
+  const evIcon = e => (e.kind === "reminder" ? P.ui("bell") : e.kind === "holiday" ? P.ui("star") : "");
+  const evTime = e => (e.kind === "holiday" ? `<span class="hol">${P.ui("star")}</span>` : e.allDay ? "Dia todo" : N(U.fmtTime(e.start)));
+  const evName = e => (e.kind === "holiday" ? `${U.esc(e.title)} <small>· feriado</small>` : evIcon(e) + U.esc(e.title));
 
   function renderAgenda() {
-    if (!el.feature) return;
-    const list = P.cal.upcoming();
+    if (!el.agenda) return;
+    renderWeek();
     const cd = P.data.calendar;
     el.agendaNote.textContent = cd && cd.sample ? "exemplos · agenda não ligada" : "";
-    renderWeek();
+    el.agenda.classList.remove("now-on");
+    if (selDay > 0) { renderDay(); return; }
 
-    if (selDay > 0) { renderDayView(list); return; }
-    el.feature.classList.remove("dayview");
-    const first = list[0];
-    if (!first) {
-      el.feature.classList.remove("now-on");
-      el.feature.innerHTML = `<div class="empty">Nada marcado<small>Nenhum compromisso nos próximos dias</small></div>`;
-      el.later.innerHTML = "";
-      return;
-    }
+    const all = P.cal.upcoming();
+    const first = all.find(e => e.kind !== "holiday");
+    if (!first) { renderEmpty(all); return; }
+
     const isNow = first.start <= new Date() && !first.allDay;
-    el.feature.classList.toggle("now-on", isNow);
-    const time = first.allDay ? `<div class="ft allday">O dia<br>todo</div>` : `<div class="ft">${U.fmtTime(first.start, true)}</div>`;
-    const c = countdown(first);
-    el.feature.innerHTML = time +
-      `<div class="fb"><div class="fl">${first.kind === "reminder" ? "Lembrete" : html.dataset.big === "1" ? "Próximo" : "Próximo compromisso"}</div>` +
-      `<div class="fn">${U.esc(first.title)}</div>` +
-      (first.loc ? `<div class="floc">${U.esc(first.loc)}</div>` : "") +
-      `<div class="fs">${U.dayLabel(first.start)}${c ? " · " + c : ""}</div></div>`;
-
-    const rest = list.slice(1, 1 + P.cfg.get("calendar.laterCount"));
-    el.later.innerHTML = rest.map(ev =>
-      `<div class="row"><span class="d">${U.dayLabel(ev.start, true)}</span>` +
-      `<span class="t">${ev.allDay ? "Dia todo" : U.fmtTime(ev.start)}</span>` +
-      `<span class="n">${ev.kind === "reminder" ? P.ui("bell", "bell") : ""}${U.esc(ev.title)}</span></div>`).join("");
-    fit(el.later);
+    el.agenda.classList.toggle("now-on", isNow);
+    const freeToday = U.dayDiff(first.start) > 0 && !all.some(e => U.dayDiff(e.start) <= 0 && e.kind !== "holiday");
+    const label = first.kind === "reminder" ? "Lembrete" : isNow ? "Agora" :
+      freeToday ? "Hoje está livre · próximo" : html.dataset.big === "1" ? "Próximo" : "Próximo compromisso";
+    const cdown = countdown(first);
+    const time = first.allDay ? `<div class="ft allday disp">Dia<br>todo</div>` : `<div class="ft disp">${U.fmtTime(first.start, true)}</div>`;
+    // o feriado de hoje já aparece embaixo da data; não repete na lista
+    const rest = all.filter(e => e !== first && !(e.kind === "holiday" && U.dayDiff(e.start) <= 0)).slice(0, Math.max(P.cfg.get("calendar.laterCount"), 2) + 2);
+    el.agenda.innerHTML =
+      `<div class="feat">${time}<div class="fb"><div class="fl">${label}</div>` +
+      `<div class="fn">${U.esc(first.title)}</div>` + (first.loc ? `<div class="floc">${U.esc(first.loc)}</div>` : "") +
+      `<div class="fs">${U.nums(longDay(first.start))}${cdown ? " · " + U.nums(cdown) : ""}</div></div></div>` +
+      `<div class="list">` + (rest.length
+        ? rest.map(e => `<div class="row ${e.kind === "holiday" ? "holiday" : ""}"><span class="d">${U.nums(U.dayLabel(e.start, true))}</span>` +
+            `<span class="t">${evTime(e)}</span><span class="n">${evName(e)}</span></div>`).join("")
+        : `<div class="list-end">${P.ui("calendar-check")}<span>Nada mais marcado nos próximos ${N(P.cfg.get("calendar.daysAhead"))} dias</span></div>`) +
+      `</div>`;
   }
 
-  /* ---------- rio ---------- */
-  function renderRiver() {
-    const show = P.cfg.get("river.show");
-    el.river.hidden = !show;
-    if (!show) return;
-    const r = P.data.river;
-    if (!r) {
-      el.river.innerHTML = `<div class="rh"><span class="kicker">Rio Itajaí-Açu · Blumenau</span><span class="stamp">${P.data.err.river ? "Sem dados" : "Carregando…"}</span></div>`;
-      return;
+  /** Estado vazio: diz o quê, por quê e o que fazer */
+  function renderEmpty(all) {
+    const days = P.cfg.get("calendar.daysAhead");
+    const mode = P.cfg.get("calendar.mode");
+    const hol = all.find(e => e.kind === "holiday");
+    const tip = mode === "demo"
+      ? `Para ver a sua agenda aqui, ligue o <b>Google Agenda</b> nas configurações.`
+      : `Para marcar um compromisso, diga: <b>“Alexa, adicione dentista na quinta às 9 horas”</b>.`;
+    el.agenda.innerHTML =
+      `<div class="empty"><div class="big disp">${days >= 7 ? "Semana livre" : "Dias livres"}</div>` +
+      `<div class="sub">Nenhum compromisso nos próximos ${N(days)} dias.</div>` +
+      (hol ? `<div class="next"><span class="k">Feriado</span><span>${U.nums(longDay(hol.start))} · ${U.esc(hol.title)}</span></div>` : "") +
+      `<div class="tip">${P.ui("info")}<span>${tip}</span></div></div>`;
+  }
+
+  /** Um dia escolhido na faixa da semana */
+  function renderDay() {
+    const base = U.startOfDay(new Date()), day = U.addDays(base, selDay), next = U.addDays(day, 1);
+    const evs = P.cal.upcoming(8).filter(e => e.start < next && e.end > day);
+    const w = P.data.weather, wd = P.weather.day(w, day);
+    const wx = wd ? `<div class="dh-wx"><div class="mm"><div class="mx">Máx ${N(r0(wd.max) + "°")}</div><div class="mn">Mín ${N(r0(wd.min) + "°")}</div></div></div>` : "";
+    const ahead = selDay === 1 ? "Amanhã" : `Daqui a ${selDay} dias`;
+    el.agenda.innerHTML =
+      `<div class="dayhead"><div><div class="dh-s">${ahead}</div><div class="dh-t disp">${U.cap(day.toLocaleDateString("pt-BR", { weekday: "long" }))}, ${day.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}</div></div>${wx}</div>` +
+      `<div class="dvlist">` + (evs.length
+        ? evs.map(e => `<div class="dvrow"><span class="t">${evTime(e)}</span><span class="n">${evName(e)}</span></div>`).join("")
+        : `<div class="dv-empty">Nada marcado neste dia</div>`) + `</div>` +
+      dayPartsHTML(selDay) +
+      `<div class="backhint">Toque em “hoje” para voltar</div>`;
+  }
+  function dayPartsHTML(offset) {
+    const parts = P.weather.dayParts(P.data.weather, offset);
+    if (!parts.length) return "";
+    return `<div class="dparts">` + parts.map(p => {
+      const info = P.wmo(p.code, !p.night);
+      return `<div class="dpart">${P.wxImg(info.icon)}<div><div class="k">${p.label}</div>` +
+        `<div class="v"><span class="disp">${r0(p.temp)}°</span>${p.pop >= 30 ? ` <small>${P.ui("droplet")}${N(p.pop + "%")}</small>` : ""}</div></div></div>`;
+    }).join("") + `</div>`;
+  }
+
+  /* =====================================================================
+     RIO E DEFESA CIVIL
+     ===================================================================== */
+  const RIVER_MSG = {
+    3: "Rio alto. Acompanhe os avisos da Defesa Civil.",
+    4: "Rio muito alto. Áreas baixas podem alagar. Siga a Defesa Civil.",
+    5: "Enchente. Siga as orientações da Defesa Civil.",
+  };
+  const ALERT_MSG = {
+    cch: { 3: "Chuva forte prevista. Pode alagar. Evite sair se não precisar.", 4: "Chuva muito forte prevista. Fique em casa se puder.", 5: "Chuva muito forte e contínua. Fique em casa." },
+    pes: { 3: "Risco de deslizamento. Fique longe de encostas e barrancos.", 4: "Deslizamentos prováveis. Se mora perto de encosta, procure um lugar seguro.", 5: "Deslizamentos generalizados. Siga a Defesa Civil." },
+  };
+  const fmtM = v => v.toFixed(2).replace(".", ",");
+
+  /** O que merece destaque agora (gravidade 1 = tudo normal … 5 = máximo) */
+  function safetyState() {
+    const r = P.cfg.get("river.show") ? P.data.river : null;
+    const st = P.alerts.enabled() ? P.alerts.status() : null;
+    const cota = +P.cfg.get("river.cota") || 0;
+    let s = { sev: 1, bg: null, fg: null, msg: "", icon: "triangle-alert" };
+    if (r && r.sev >= 3) s = { sev: r.sev, bg: r.cond.bg, fg: r.cond.fg, msg: RIVER_MSG[r.sev] || RIVER_MSG[5], icon: "waves" };
+    if (r && cota > 0) {                       // a cota da rua é o aviso mais útil para quem mora lá
+      const gap = cota - r.level;
+      if (gap <= 1.5 && (r.trend === "up" || gap <= .5)) {
+        const sev = Math.max(4, r.sev);
+        s = { sev, bg: sev >= 5 ? r.cond.bg : "#990000", fg: "#ffffff", icon: "house",
+          msg: gap <= 0 ? "O rio passou da altura em que a sua rua alaga. Siga a Defesa Civil."
+            : `O rio está a ${fmtM(gap)} m de alagar a sua rua${r.trend === "up" ? " e está subindo" : ""}.` };
+      }
     }
-    const MAX = 9;
-    const zones = r.conds.map((c, i) => {
-      const end = i + 1 < r.conds.length ? r.conds[i + 1].level : MAX;
-      return `<i style="width:${((end - c.level) / MAX) * 100}%;background:${c.bg}"></i>`;
-    }).join("");
-    const ticks = r.conds.map(c => `<span style="left:${(c.level / MAX) * 100}%">${c.level}</span>`).join("");
-    const when = new Date(r.last), ageH = (Date.now() - when) / 3600000;
-    const trend = r.trend === "up" ? ["▲ Subindo", "var(--hot)"] : r.trend === "down" ? ["▼ Descendo", "var(--cold)"] : ["● Estável", "var(--soft)"];
-    el.river.classList.toggle("alert", r.cond.level >= 4);
-    el.river.innerHTML =
-      `<div class="rh"><span class="kicker">Rio Itajaí-Açu · Blumenau</span>` +
-      `<span class="stamp">${ageH > 3 ? "⚠ Dado antigo · " : "Leitura das "}${U.fmtTime(when)}</span></div>` +
-      `<div class="rb"><div><div class="rv">${r.level.toFixed(2).replace(".", ",")}<small>metros</small></div>` +
-      `<div class="tr" style="color:${trend[1]}">${trend[0]}</div></div>` +
-      `<div><div class="badge" style="background:${r.cond.bg};color:${r.cond.fg}">${U.esc(r.cond.name)}</div>` +
-      `<div class="gauge"><div class="zones">${zones}</div><div class="mark" style="left:${Math.min(r.level / MAX, 1) * 100}%"></div></div>` +
-      `<div class="ticks">${ticks}</div></div></div>`;
+    if (st) for (const it of st.items) {
+      if (it.sev >= 3 && it.sev > s.sev) {
+        s = { sev: it.sev, bg: it.bg, fg: it.fg, icon: it.tipo === "pes" ? "mountain" : "cloud-rain",
+          msg: ((ALERT_MSG[it.tipo] || {})[Math.min(it.sev, 5)] || `${it.kind}: ${it.cond}.`) + (st.region ? "" : ` (região ${it.region})`) };
+      }
+    }
+    return s;
+  }
+  P.view.safetyState = safetyState;
+
+  function renderSafety() {
+    const showR = P.cfg.get("river.show");
+    const st = P.alerts.enabled() ? P.alerts.status() : null;
+    if (!showR && !st) { el.safety.hidden = true; return; }
+    el.safety.hidden = false;
+    const r = showR ? P.data.river : null;
+    const s = safetyState();
+    el.safety.classList.toggle("alert", s.sev >= 3);
+    el.safety.style.borderColor = s.sev >= 3 ? s.bg : "";
+
+    let head, body = "";
+    if (showR) {
+      let stamp = P.data.err.river ? "Sem dados agora" : "Buscando…";
+      if (r) {
+        const when = new Date(r.last), ageH = (Date.now() - when) / 3600000;
+        stamp = ageH > 3 ? `⚠ Dado antigo, das ${N(U.fmtTime(when))}` : `Leitura das ${N(U.fmtTime(when))}`;
+      }
+      // normal: selo discreto (bolinha + palavra); a partir de "Observação": selo cheio na cor oficial
+      const badge = !r ? "" : r.sev <= 1
+        ? `<span class="badge quiet"><i style="background:${r.cond.bg}"></i>${U.esc(r.cond.name)}</span>`
+        : `<span class="badge" style="background:${r.cond.bg};color:${r.cond.fg}">${U.esc(r.cond.name)}</span>`;
+      head = `<div class="sf-head"><span class="kicker">Rio Itajaí-Açu</span><span class="right"><span class="sf-stamp">${stamp}</span>${badge}</span></div>`;
+      if (r) {
+        const rate = Math.abs(r.rate) >= .05 ? ` · ${N(Math.round(Math.abs(r.rate) * 100))} cm/h` : "";
+        const tr = r.trend === "up" ? [P.ui("arrow-up"), "Subindo" + rate, "var(--hot)"]
+          : r.trend === "down" ? [P.ui("arrow-down"), "Descendo" + rate, "var(--cold)"] : [P.ui("minus"), "Estável", "var(--soft)"];
+        body = `<div class="sf-body"><div><div class="rv disp">${fmtM(r.level)}<small>m</small></div>` +
+          `<div class="trend"><span style="color:${tr[2]};display:flex">${tr[0]}</span><span>${tr[1]}</span></div></div>` +
+          `<div class="chart" id="riverChart"></div></div>`;
+      }
+    } else {
+      head = `<div class="sf-head"><span class="kicker">Defesa Civil · Blumenau</span></div>`;
+    }
+
+    let dc = "";
+    if (st) {
+      const bad = st.items.filter(i => i.sev > 1).sort((a, b) => b.sev - a.sev);
+      const where = st.region ? "no seu bairro" : "em Blumenau";
+      dc = bad.length
+        ? `<div class="sf-dc"><span class="dot" style="background:${bad[0].bg}"></span><span>Defesa Civil: ` +
+            bad.map(i => `${i.kind.toLowerCase()} em <b>${U.esc(i.cond.toLowerCase())}</b>${st.region ? "" : " na região " + U.esc(i.region)}`).join(" · ") + `</span></div>`
+        : `<div class="sf-dc"><span class="dot" style="background:#64EE64"></span><span>Defesa Civil: <b>tudo normal</b> ${where}</span></div>`;
+    }
+
+    const action = s.sev >= 3
+      ? `<div class="sf-action" style="background:${s.bg};color:${s.fg}">${P.ui(s.icon)}<span>${U.nums(s.msg)}</span><span class="tel">${P.ui("phone")}Defesa Civil ${N("199")}</span></div>` : "";
+
+    el.safety.innerHTML = head + action + body + dc;
   }
 
-  /* ---------- aviso de conexão ---------- */
+  /** Gráfico das últimas 24 h: linha do nível, faixas oficiais na régua da direita, cota da rua */
+  function drawChart() {
+    const box = document.getElementById("riverChart"), r = P.data.river;
+    if (!box || !r || el.safety.classList.contains("compact")) return;
+    const W = box.clientWidth, H = box.clientHeight;
+    if (W < 60 || H < 20) return;
+    const rem = parseFloat(getComputedStyle(html).fontSize);
+    const cota = +P.cfg.get("river.cota") || 0;
+    const ser = r.series.length ? r.series : [{ t: r.last, v: r.level }];
+    const vmax = Math.max(...ser.map(p => p.v));
+    const top = Math.max(9, cota ? cota + .8 : 0, vmax + .8);
+    const pw = W - 5.6 * rem;                                  // área do gráfico (o resto é a régua com as faixas)
+    const x = i => (ser.length < 2 ? pw : (i / (ser.length - 1)) * pw);
+    const y = v => H - (Math.max(0, v) / top) * H;
+    let s = "";
+    // linhas finas nas faixas oficiais
+    r.conds.forEach(c => { if (c.level > 0 && c.level < top) s += `<line x1="0" x2="${pw}" y1="${y(c.level)}" y2="${y(c.level)}" stroke="var(--rule)" stroke-width="1"/>`; });
+    // régua com as faixas (cor + número; o nome da faixa está no selo ao lado)
+    const bx = pw + 1 * rem, bw = .9 * rem;
+    r.conds.forEach((c, i) => {
+      const hi = Math.min(i + 1 < r.conds.length ? r.conds[i + 1].level : top, top);
+      if (c.level >= top) return;
+      s += `<rect x="${bx}" y="${y(hi) + 1}" width="${bw}" height="${Math.max(1, y(c.level) - y(hi) - 2)}" rx="${bw / 2}" fill="${c.bg}"/>`;
+    });
+    // área + linha
+    const pts = ser.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`);
+    const line = "M" + pts.join("L");
+    // preenchimento: neutro quando está normal; na cor da faixa a partir de "Observação"
+    const fill = r.sev >= 2 ? `fill="${r.cond.bg}" opacity=".24"` : `fill="var(--text-c)" opacity=".07"`;
+    s += `<path d="${line}L${x(ser.length - 1).toFixed(1)},${H}L0,${H}Z" ${fill}/>`;
+    s += `<path d="${line}" fill="none" stroke="var(--text-c)" stroke-width="${(.42 * rem).toFixed(1)}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (cota) s += `<line x1="0" x2="${pw}" y1="${y(cota)}" y2="${y(cota)}" stroke="var(--accent)" stroke-width="${(.28 * rem).toFixed(1)}" stroke-dasharray="${rem} ${.7 * rem}"/>`;
+    const lx = x(ser.length - 1), ly = y(ser[ser.length - 1].v);
+    s += `<circle cx="${lx}" cy="${ly}" r="${rem}" fill="var(--text-c)" stroke="var(--bg)" stroke-width="${(.35 * rem).toFixed(1)}"/>`;
+    let labels = "", lastY = Infinity;
+    r.conds.filter(c => c.level > 0 && c.level < top).forEach(c => {          // de baixo para cima; pula o que encostaria no anterior
+      const yy = y(c.level);
+      if (lastY - yy < 2.6 * rem) return;
+      labels += `<span class="yl num" style="top:${yy}px;left:${bx + bw + .8 * rem}px">${c.level}</span>`;
+      lastY = yy;
+    });
+    if (cota) labels += `<span class="yl cota" style="top:${y(cota)}px">Sua rua alaga · ${N(fmtM(cota).replace(/,00$/, "").replace(/0$/, "") + " m")}</span>`;
+    labels += `<span class="xl" style="left:0">${N("24")} h atrás</span><span class="xl" style="left:${pw}px;transform:translateX(-100%)">agora</span>`;
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${s}</svg>${labels}`;
+  }
+
+  /* =====================================================================
+     AVISO DE CONEXÃO (no cabeçalho, nunca por cima do conteúdo)
+     ===================================================================== */
   function renderStatus() {
     const msgs = [];
     const w = P.data.weather;
     if (P.data.err.weather && (!w || Date.now() - w.at > 30 * 60000)) msgs.push("Tempo sem atualizar");
-    if (P.cfg.get("river.show") && P.data.err.river) msgs.push("Sem dados do rio");
+    if (P.cfg.get("river.show") && P.data.err.river && !P.data.river) msgs.push("Sem dados do rio");
     if (P.cfg.get("calendar.mode") !== "demo" && P.data.err.calendar) msgs.push("Agenda sem atualizar");
     el.status.hidden = !msgs.length;
+    el.agendaNote.hidden = !!msgs.length;
     if (msgs.length) el.status.innerHTML = P.ui("wifi-off") + `<span>${U.esc(msgs.join(" · "))}</span>`;
+  }
+
+  /* =====================================================================
+     ENCAIXE: quando falta espaço (tela pequena ou letras grandes), some primeiro o menos importante.
+     Nunca somem: hora, tempo agora e o cartão da agenda. Em alerta, o cartão do rio também não some.
+     ===================================================================== */
+  function fitList(box) {
+    if (!box) return;
+    let guard = 20;
+    while (box.scrollHeight > box.clientHeight + 1 && box.children.length > 1 && guard--) box.removeChild(box.lastElementChild);
+  }
+  /** Altura mínima que o cartão da agenda precisa: o destaque (ou o estado vazio) + uma linha da lista */
+  function agendaNeed() {
+    let need = 0;
+    for (const c of el.agenda.children) {
+      if (c.classList.contains("list") || c.classList.contains("dvlist")) need += c.firstElementChild ? Math.min(c.firstElementChild.offsetHeight, 120) : 0;
+      else if (c.classList.contains("empty")) need += c.scrollHeight;
+      else need += c.offsetHeight;
+    }
+    return need;
+  }
+  function runSteps(side, steps, extra) {
+    const over = () => side.scrollHeight > side.clientHeight + 1 || (extra ? extra() : false);
+    steps.forEach(s => s.off());
+    const applied = [];
+    for (const s of steps) {
+      if (s.skip && s.skip()) continue;
+      if (over() || (s.clipped && s.clipped())) { s.on(); applied.push(s); }
+    }
+    for (const s of applied.reverse()) {                 // devolve o que couber
+      s.off();
+      if (over() || (s.clipped && s.clipped())) s.on();
+    }
+  }
+  function layout() {
+    renderAgenda();
+    const alert = el.safety.classList.contains("alert");
+    const weekWx = () => !!(P.cfg.get("weekWeather") && P.data.weather);
+    runSteps(el.sideB, [
+      { on: () => el.week.classList.add("no-wx"), off: () => el.week.classList.toggle("no-wx", !weekWx()), skip: () => !weekWx() },
+      { on: () => el.safety.classList.add("compact"), off: () => el.safety.classList.remove("compact"), skip: () => alert },
+      { on: () => el.week.classList.add("squeezed"), off: () => el.week.classList.remove("squeezed") },
+      { on: () => el.safety.classList.add("squeezed"), off: () => el.safety.classList.remove("squeezed"), skip: () => alert },
+    ], () => el.agenda.clientHeight + 1 < agendaNeed());
+    const ahead = el.wxAhead;
+    runSteps(el.sideA, [
+      { on: () => ahead.classList.add("tight"), off: () => ahead.classList.remove("tight"),
+        clipped: () => ahead.scrollHeight > ahead.clientHeight + 1 },
+      { on: () => { ahead.classList.add("squeezed"); el.aheadRule.classList.add("squeezed"); },
+        off: () => { ahead.classList.remove("squeezed"); el.aheadRule.classList.remove("squeezed"); },
+        clipped: () => !ahead.classList.contains("squeezed") && ahead.scrollHeight > ahead.clientHeight + 1 },
+      { on: () => el.wxHint.classList.add("squeezed"), off: () => el.wxHint.classList.remove("squeezed") },
+    ]);
+    fitList(el.agenda.querySelector(".list"));
+    fitList(el.agenda.querySelector(".dvlist"));
+    drawChart();
   }
 
   function renderAll() {
     applyLook();
     lastTime = ""; lastMinute = -1;
-    tick();
-    renderWeather(); renderRiver(); renderAgenda(); renderStatus();
-    fitSides();
+    tick();                                   // tick → minute → agenda, tempo à frente, rio, encaixe
+    renderNow(); renderStatus();
+    layout();
   }
 
   P.view.init = function () {
@@ -278,19 +462,18 @@
     P.bus.on("wake", () => P.view.resetDay());
     P.bus.on("cfg", () => renderAll());
     P.bus.on("data", which => {
-      if (which === "weather") renderWeather();
-      if (which === "river") renderRiver();
-      if (which === "calendar") renderAgenda();
+      if (which === "weather") { renderNow(); renderAhead(); renderWeek(); }
+      if (which === "river" || which === "alerts") renderSafety();
       renderStatus();
+      layout();
     });
     renderAll();
     setInterval(tick, 1000);
-    // depois que as fontes carregam, as alturas mudam: refaz o ajuste de espaço
-    const refit = U.debounce(() => { renderWeather(); renderAgenda(); fitSides(); }, 120);
+    // depois que as fontes carregam, as alturas mudam: refaz o encaixe
+    const refit = U.debounce(() => { renderSafety(); layout(); }, 120);
     if (document.fonts) { document.fonts.addEventListener("loadingdone", refit); document.fonts.ready.then(refit); }
     window.addEventListener("load", refit);
-    window.addEventListener("resize", U.debounce(() => { renderWeather(); renderAgenda(); fitSides(); }, 250));
+    window.addEventListener("resize", U.debounce(() => { renderSafety(); layout(); }, 200));
   };
   P.view.renderAll = renderAll;
-  P.view.fitSides = fitSides;
 })();

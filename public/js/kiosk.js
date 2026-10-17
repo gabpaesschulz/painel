@@ -15,14 +15,20 @@
   function fillRest() {
     if (!rest) return;
     const now = new Date();
-    U.$(".rt", rest).textContent = U.fmtTime(now);
+    U.$(".rt", rest).innerHTML = P.view.clockHTML(now);
     const wd = now.toLocaleDateString("pt-BR", { weekday: "long" });
-    U.$(".rd", rest).textContent = U.cap(wd) + ", " + now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
-    const next = P.cal.upcoming()[0];
-    U.$(".rn", rest).textContent = next
-      ? `Próximo: ${next.title} — ${U.dayLabel(next.start)}${next.allDay ? "" : " às " + U.fmtTime(next.start)}`
+    U.$(".rd", rest).innerHTML = U.cap(wd) + ", " + U.nums(now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" }));
+    const next = P.cal.upcoming().find(e => e.kind !== "holiday");
+    U.$(".rn", rest).innerHTML = next
+      ? `Próximo: ${U.esc(next.title)} · ${U.nums(P.view.longDay(next.start))}${next.allDay ? "" : " às " + U.nums(U.fmtTime(next.start))}`
       : "";
-    // desloca um pouquinho a cada minuto (evita imagem "queimada" na tela)
+    // avisos importantes continuam visíveis (e com brilho normal) no descanso
+    const s = P.view.safetyState();
+    const ra = U.$(".ra", rest);
+    ra.innerHTML = s.sev >= 3 ? P.ui(s.icon) + `<span>${U.nums(s.msg)}</span>` : "";
+    ra.style.background = s.sev >= 3 ? s.bg : "";
+    ra.style.color = s.sev >= 3 ? s.fg : "";
+    // desloca um pouquinho a cada minuto (evita imagem "marcada" na tela)
     const dx = (Math.random() * 6 - 3).toFixed(1), dy = (Math.random() * 4 - 2).toFixed(1);
     U.$(".ri", rest).style.transform = `translate(${dx}rem, ${dy}rem)`;
   }
@@ -49,6 +55,7 @@
   function activity() { lastAct = Date.now(); if (resting) wake(); }
 
   function checkIdle() {
+    if (P.view.safetyState().sev >= 4) { if (resting) wake(); return; }   // em alerta, o painel fica inteiro na tela
     const lim = idleLimitMs();
     if (lim && !resting && Date.now() - lastAct >= lim) enterRest();
   }
