@@ -212,15 +212,29 @@
     box.innerHTML = testBox.city;
   }
 
+  /** grava na hora o que estiver nos campos de texto (evita testar com o valor antigo) */
+  function flushInputs() {
+    U.$$("[data-bind]", main).forEach(el => {
+      if (el.type === "range" || el.tagName === "SELECT" || el.type === "time") return;
+      const path = el.dataset.bind; let v = el.value;
+      if (el.dataset.num) v = parseFloat(v);
+      if (typeof v === "string") v = v.trim();
+      if (P.cfg.get(path) !== v) { P.cfg.set(path, v, true); }
+    });
+  }
+
   async function runTest(kind) {
+    flushInputs();
     const box = U.$(kind === "cal" ? "#calTest" : "#riverTest");
     box.innerHTML = callout("", "Testando…");
     try {
       if (kind === "cal") {
         const evs = await P.cal.fetchRaw();
         const next = evs.filter(e => e.end > new Date()).sort((a, b) => a.start - b.start).slice(0, 4);
-        testBox.cal = callout("ok", `✔ <b>Funcionou.</b> ${evs.length} compromisso(s) nos próximos dias.` +
-          (next.length ? "<br>" + next.map(e => `${esc(U.dayLabel(e.start))} ${e.allDay ? "" : U.fmtTime(e.start)} — ${esc(e.title)}`).join("<br>") : ""));
+        testBox.cal = next.length
+          ? callout("ok", `✔ <b>Funcionou!</b> Achei ${next.length === 1 ? "1 compromisso" : "compromissos"} nos próximos ${P.cfg.get("calendar.daysAhead")} dias:<br>` +
+              next.map(e => `${esc(U.dayLabel(e.start))} ${e.allDay ? "" : U.fmtTime(e.start)} — ${esc(e.title)}`).join("<br>"))
+          : callout("ok", `✔ <b>A agenda está ligada e foi lida.</b> Mas não há nenhum compromisso marcado nos próximos ${P.cfg.get("calendar.daysAhead")} dias, por isso o painel mostra “Nada marcado”. Crie um evento para amanhã e toque em <b>Testar agora</b> de novo.`);
         P.cal.refresh();
       } else {
         await P.river.refresh();
@@ -334,6 +348,8 @@
       main = U.$(".sh-main", root); nav = U.$(".sh-nav", root);
       root.addEventListener("click", onClick);
       root.addEventListener("input", onInput);
+      root.addEventListener("paste", () => setTimeout(flushInputs, 0));
+      root.addEventListener("focusout", flushInputs);
       root.addEventListener("change", onInput);
       root.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "citySearch") citySearch(); if (e.key === "Escape") close(); });
     },
