@@ -243,7 +243,8 @@
     try {
       if (kind === "cal") {
         const evs = await P.cal.fetchRaw();
-        const next = evs.filter(e => e.end > new Date()).sort((a, b) => a.start - b.start).slice(0, 4);
+        const until = U.addDays(U.startOfDay(new Date()), P.cfg.get("calendar.daysAhead"));
+        const next = evs.filter(e => e.end > new Date() && e.start < until).sort((a, b) => a.start - b.start).slice(0, 4);
         testBox.cal = next.length
           ? callout("ok", `✔ <b>Funcionou!</b> Achei ${next.length === 1 ? "1 compromisso" : "compromissos"} nos próximos ${P.cfg.get("calendar.daysAhead")} dias:<br>` +
               next.map(e => `${esc(U.dayLabel(e.start))} ${e.allDay ? "" : U.fmtTime(e.start)} — ${esc(e.title)}`).join("<br>"))

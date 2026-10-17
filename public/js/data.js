@@ -159,7 +159,8 @@
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(h));
   }
-  const hexColor = n => (typeof n === "string" ? n : "#" + (n >>> 0).toString(16).padStart(6, "0"));
+  // a cor vai direto para o HTML: texto que não for uma cor (#rrggbb) não entra
+  const hexColor = n => (typeof n === "string" ? (/^#[0-9a-f]{3,8}$/i.test(n) ? n : "#888888") : "#" + (n >>> 0).toString(16).padStart(6, "0"));
   const ms = s => (s ? new Date(s).getTime() || 0 : 0);
   async function getJSON(u) {
     const r = await U.fetchT(u + (u.includes("?") ? "&" : "?") + "a=" + Date.now(), { cache: "no-store" }, 12000);
@@ -173,18 +174,21 @@
 
   function buildRiver(d) {
     const pts = d.niveis;
-    const last = pts[pts.length - 1];
+    const last = pts[pts.length - 1], lastT = ms(last.horaLeitura);
     const conds = d.condicoes.filter(c => c.tipo === "nvl").sort((a, b) => a.nivel - b.nivel)
       .map(c => ({ level: c.nivel, name: c.condicao, bg: hexColor(c.cor_fundo), fg: hexColor(c.cor_fonte) }));
     let cond = conds[0];
     for (const c of conds) if (last.nivel >= c.level) cond = c;
-    const ref = pts[Math.max(0, pts.length - 4)].nivel;          // ~3 horas atrás
-    const diff = last.nivel - ref;
+    // tendência (~3 h) e gráfico (24 h) pelo horário de cada leitura, não pela posição:
+    // a Defesa Civil pode publicar de 15 em 15 min numa cheia, ou pular horas
+    const want = lastT - 3 * 3600000;
+    const ref = pts.reduce((b, p) => (Math.abs(ms(p.horaLeitura) - want) < Math.abs(ms(b.horaLeitura) - want) ? p : b));
+    const hours = (lastT - ms(ref.horaLeitura)) / 3600000, diff = last.nivel - ref.nivel;
     return {
       at: Date.now(), level: last.nivel, cond, conds, last: last.horaLeitura,
       sev: P.severity(cond.name),
-      trend: diff > 0.05 ? "up" : diff < -0.05 ? "down" : "flat", rate: diff / 3,   // m/h
-      series: pts.slice(-25).map(p => ({ t: p.horaLeitura, v: p.nivel })),
+      trend: diff > 0.05 ? "up" : diff < -0.05 ? "down" : "flat", rate: hours > 0 ? diff / hours : 0,   // m/h
+      series: pts.filter(p => ms(p.horaLeitura) >= lastT - 24 * 3600000).map(p => ({ t: p.horaLeitura, v: p.nivel })),
       source: d.fonte || "AlertaBLU",
     };
   }
@@ -332,7 +336,8 @@
       const ev = new ICAL.Event(ve);
       if (ev.isRecurrenceException()) exceptions.push(ev); else masters.set(ev.uid, ev);
     }
-    exceptions.forEach(ex => { const m = masters.get(ex.uid); if (m) m.relateException(ex); });
+    // uma ocorrência solta de uma série que não está nesta agenda (ex.: convidado para um dia só) vale como evento avulso
+    exceptions.forEach(ex => { const m = masters.get(ex.uid); if (m) m.relateException(ex); else masters.set(ex.uid + "|" + ex.recurrenceId, ex); });
 
     const push = (sd, ed, item, uid) => {
       const status = item.component.getFirstPropertyValue("status");
@@ -415,7 +420,9 @@
     const list = P.cfg.get("reminders") || [];
     for (let d = U.startOfDay(from); d < to; d = U.addDays(d, 1)) {
       for (const r of list) {
-        if (!r.text || (r.days && r.days.length && !r.days.includes(d.getDay()))) continue;
+        // nenhum dia marcado = lembrete pausado (lembretes antigos, sem a lista de dias, valem todo dia); sem hora, não entra
+        const days = r.days || [0, 1, 2, 3, 4, 5, 6];
+        if (!r.text || !/^\d{1,2}:\d{2}$/.test(r.time || "") || !days.includes(d.getDay())) continue;
         const [h, m] = U.parseHM(r.time);
         const start = new Date(d); start.setHours(h, m, 0, 0);
         out.push({ id: "r" + r.id + start.getTime(), start, end: new Date(start.getTime() + 15 * 60000), allDay: false, title: r.text, loc: "", kind: "reminder" });
@@ -426,7 +433,8 @@
 
   cal.fetchRaw = async function () {
     const c = P.cfg.get("calendar");
-    const from = U.startOfDay(new Date()), to = U.addDays(from, c.daysAhead);
+    // a faixa da semana sempre mostra 7 dias, mesmo com a lista olhando só 3 à frente
+    const from = U.startOfDay(new Date()), to = U.addDays(from, Math.max(c.daysAhead, 7));
     if (c.mode === "ics") return fetchICS(from, to);
     if (c.mode === "apikey") return fetchGoogleApi(from, to);
     return sampleEvents();
@@ -434,19 +442,27 @@
 
   cal.refresh = async function () {
     const c = P.cfg.get("calendar");
-    let events = [];
+    let events = [], okAt = P.cache.get("calendarOk") || 0;
     try {
       events = await cal.fetchRaw();
+      okAt = Date.now();
       P.data.err.calendar = false;
       P.cache.set("calendar", events.map(e => Object.assign({}, e, { start: +e.start, end: +e.end })));
+      P.cache.set("calendarOk", okAt);
     } catch (e) {
       console.warn("agenda:", e.message);
       P.data.err.calendar = e.message;
       const cached = P.cache.get("calendar");
       if (cached) events = cached.map(x => Object.assign({}, x, { start: new Date(x.start), end: new Date(x.end) }));
     }
-    P.data.calendar = { at: Date.now(), events, sample: c.mode === "demo" };
+    P.data.calendar = { at: Date.now(), okAt, events, sample: c.mode === "demo" };
     P.bus.emit("data", "calendar");
+  };
+
+  /** A agenda não é lida há mais de 15 min (ou nunca foi): o painel não pode dizer "semana livre" */
+  cal.stale = function () {
+    const d = P.data.calendar;
+    return !!(d && !d.sample && P.data.err.calendar && Date.now() - (d.okAt || 0) > 15 * 60000);
   };
 
   /** Tudo o que ainda vai acontecer (agenda + lembretes + feriados), em ordem; dias inteiros primeiro */

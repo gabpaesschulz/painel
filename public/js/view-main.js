@@ -160,13 +160,21 @@
      ===================================================================== */
   function countdown(ev) {
     const now = new Date();
+    if (ev.allDay) {                                  // "Dia todo" já diz tudo; o que dura vários dias diz até quando
+      const lastDay = new Date(ev.end.getTime() - 1);
+      if (ev.start > now || U.sameDay(lastDay, now)) return "";
+      return "até " + (U.dayDiff(lastDay) === 1 ? "amanhã" : lastDay.toLocaleDateString("pt-BR", { weekday: "long" }));
+    }
     if (ev.start <= now) return ev.end - ev.start >= 20 * 60000 ? `acontecendo agora, até ${U.fmtTime(ev.end)}` : "acontecendo agora";
     const min = Math.round((ev.start - now) / 60000);
     if (min < 60) return `daqui a ${min} ${min === 1 ? "minuto" : "minutos"}`;
     if (U.sameDay(ev.start, now)) { const h = Math.round(min / 60); return `daqui a ${h} ${h === 1 ? "hora" : "horas"}`; }
     return "";
   }
-  const evIcon = e => (e.kind === "reminder" ? P.ui("bell") : e.kind === "holiday" ? P.ui("star") : "");
+  /** Dia a mostrar: o que já começou (uma viagem desde ontem) aparece como hoje, não com a data de ontem */
+  const shownDay = e => (e.start < U.startOfDay(new Date()) ? new Date() : e.start);
+  P.view.shownDay = shownDay;
+  const evIcon = e =>(e.kind === "reminder" ? P.ui("bell") : e.kind === "holiday" ? P.ui("star") : "");
   const evTime = e => (e.kind === "holiday" ? `<span class="hol">${P.ui("star")}</span>` : e.allDay ? "Dia todo" : N(U.fmtTime(e.start)));
   const evName = e => (e.kind === "holiday" ? `${U.esc(e.title)} <small>· feriado</small>` : evIcon(e) + U.esc(e.title));
 
@@ -194,16 +202,27 @@
     el.agenda.innerHTML =
       `<div class="feat">${time}<div class="fb"><div class="fl">${label}</div>` +
       `<div class="fn">${U.esc(first.title)}</div>` + (first.loc ? `<div class="floc">${U.esc(first.loc)}</div>` : "") +
-      `<div class="fs">${U.nums(longDay(first.start))}${cdown ? " · " + U.nums(cdown) : ""}</div></div></div>` +
+      `<div class="fs">${U.nums(longDay(shownDay(first)))}${cdown ? " · " + U.nums(cdown) : ""}</div></div></div>` +
       `<div class="list">` + (rest.length
-        ? rest.map(e => `<div class="row ${e.kind === "holiday" ? "holiday" : ""}"><span class="d">${U.nums(U.dayLabel(e.start, true))}</span>` +
+        ? rest.map(e => `<div class="row ${e.kind === "holiday" ? "holiday" : ""}"><span class="d">${U.nums(U.dayLabel(shownDay(e), true))}</span>` +
             `<span class="t">${evTime(e)}</span><span class="n">${evName(e)}</span></div>`).join("")
-        : `<div class="list-end">${P.ui("calendar-check")}<span>Nada mais marcado nos próximos ${N(P.cfg.get("calendar.daysAhead"))} dias</span></div>`) +
+        : P.cal.stale()
+          ? `<div class="list-end">${P.ui("wifi-off")}<span>Agenda sem atualizar: pode faltar compromisso</span></div>`
+          : `<div class="list-end">${P.ui("calendar-check")}<span>Nada mais marcado nos próximos ${N(P.cfg.get("calendar.daysAhead"))} dias</span></div>`) +
       `</div>`;
   }
 
   /** Estado vazio: diz o quê, por quê e o que fazer */
   function renderEmpty(all) {
+    // sem conseguir ler a agenda, "semana livre" seria uma calma falsa
+    if (P.cal.stale()) {
+      const okAt = P.data.calendar.okAt;
+      el.agenda.innerHTML =
+        `<div class="empty"><div class="big disp">Agenda sem atualizar</div>` +
+        `<div class="sub">Não consigo ler o Google Agenda${okAt ? " (última leitura " + U.nums(U.stamp(new Date(okAt))) + ")" : ""}. Pode haver compromissos que não aparecem aqui.</div>` +
+        `<div class="tip">${P.ui("wifi-off")}<span>Confira a internet do tablet. Se continuar assim, avise quem cuida do painel.</span></div></div>`;
+      return;
+    }
     const days = P.cfg.get("calendar.daysAhead");
     const mode = P.cfg.get("calendar.mode");
     const hol = all.find(e => e.kind === "holiday");
@@ -390,7 +409,7 @@
     const w = P.data.weather;
     if (P.data.err.weather && (!w || Date.now() - w.at > 30 * 60000)) msgs.push("Tempo sem atualizar");
     if (P.cfg.get("river.show") && P.data.err.river && !P.data.river) msgs.push("Sem dados do rio");
-    if (P.cfg.get("calendar.mode") !== "demo" && P.data.err.calendar) msgs.push("Agenda sem atualizar");
+    if (P.cal.stale()) msgs.push("Agenda sem atualizar");
     el.status.hidden = !msgs.length;
     el.agendaNote.hidden = !!msgs.length;
     if (msgs.length) el.status.innerHTML = P.ui("wifi-off") + `<span>${U.esc(msgs.join(" · "))}</span>`;

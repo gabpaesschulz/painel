@@ -67,6 +67,13 @@ RRULE:FREQ=WEEKLY
 SUMMARY:Missa
 END:VEVENT
 BEGIN:VEVENT
+UID:serie-alheia@x
+RECURRENCE-ID;TZID=America/Sao_Paulo:${ymd(t2)}T140000
+DTSTART;TZID=America/Sao_Paulo:${ymd(t2)}T150000
+DTEND;TZID=America/Sao_Paulo:${ymd(t2)}T160000
+SUMMARY:Reunião do condomínio
+END:VEVENT
+BEGIN:VEVENT
 UID:cancel@x
 DTSTART;TZID=America/Sao_Paulo:${ymd(t1)}T120000
 DTEND;TZID=America/Sao_Paulo:${ymd(t1)}T130000
@@ -85,7 +92,16 @@ assert(titles.includes("Aniversário da Ana") && evs.find(e => e.title.startsWit
 assert(titles.filter(t => t === "Hidroginástica").length >= 1, "recorrência semanal");
 assert(titles.filter(t => t === "Remédio da pressão").length === 7, "repetição diária de 2015 (milhares de voltas) aparece todo dia");
 assert(titles.filter(t => t === "Missa").length === 1, "repetição semanal de 2005 aparece na semana");
+assert(titles.includes("Reunião do condomínio"), "uma ocorrência solta de série de outra agenda (convite para um dia só)");
 assert(titles.includes("Evento em UTC"), "utc");
 assert(!titles.includes("Cancelado"), "cancelado some");
 assert(evs.find(e => e.title === "Dentista").start.getHours() === 9, "fuso do dentista = 9h");
+
+// lembretes: nenhum dia marcado = pausado; sem a lista de dias (configuração antiga) = todo dia
+P.data.calendar = { events: [] };
+P.cfg.set("reminders", [{ id: "a", time: "23:59", text: "Pausado", days: [] }, { id: "b", time: "23:59", text: "Antigo" }], true);
+const rem = P.cal.upcoming(7).filter(e => e.kind === "reminder").map(e => e.title);
+assert(!rem.includes("Pausado"), "lembrete sem nenhum dia marcado não aparece");
+assert(rem.filter(t => t === "Antigo").length === 7, "lembrete antigo (sem dias) aparece todo dia");
+
 console.log(process.exitCode ? "\nHÁ FALHAS" : "\nOK — leitor de agenda funcionando");

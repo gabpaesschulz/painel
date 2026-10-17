@@ -20,7 +20,7 @@
     U.$(".rd", rest).innerHTML = U.cap(wd) + ", " + U.nums(now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" }));
     const next = P.cal.upcoming().find(e => e.kind !== "holiday");
     U.$(".rn", rest).innerHTML = next
-      ? `Próximo: ${U.esc(next.title)} · ${U.nums(P.view.longDay(next.start))}${next.allDay ? "" : " às " + U.nums(U.fmtTime(next.start))}`
+      ? `Próximo: ${U.esc(next.title)} · ${U.nums(P.view.longDay(P.view.shownDay(next)))}${next.allDay ? "" : " às " + U.nums(U.fmtTime(next.start))}`
       : "";
     // avisos importantes continuam visíveis (e com brilho normal) no descanso
     const s = P.view.safetyState();

@@ -1,6 +1,6 @@
 /* Guarda os arquivos do painel para abrir mesmo sem internet.
    - Código e páginas: rede primeiro (sempre a versão mais nova); cache só se estiver sem internet.
-   - Fontes, ícones e bibliotecas: cache primeiro (não mudam).
+   - Fontes, ícones e bibliotecas: cache primeiro (rápido), conferidos em segundo plano.
    - Dados (/api, river/alerts/status/version.json, tempo, agenda): nunca ficam presos aqui. */
 const V = "painel-v3";
 self.addEventListener("install", () => self.skipWaiting());
@@ -15,7 +15,11 @@ self.addEventListener("fetch", e => {
   e.respondWith(caches.open(V).then(async c => {
     if (heavy) {
       const hit = await c.match(e.request);
-      if (hit) return hit;
+      if (hit) {
+        // entrega o guardado na hora e confere em segundo plano: se um ícone ou fonte mudar, a próxima abertura já pega
+        e.waitUntil(fetch(e.request).then(r => { if (r.ok) return c.put(e.request, r); }).catch(() => {}));
+        return hit;
+      }
     }
     try {
       const r = await fetch(e.request, { cache: "no-store" });
