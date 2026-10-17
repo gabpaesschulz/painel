@@ -53,6 +53,20 @@ SUMMARY:Evento em UTC
 STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
+UID:remedio@x
+DTSTART;TZID=America/Sao_Paulo:20150310T080000
+DTEND;TZID=America/Sao_Paulo:20150310T081500
+RRULE:FREQ=DAILY
+SUMMARY:Remédio da pressão
+END:VEVENT
+BEGIN:VEVENT
+UID:missa@x
+DTSTART;TZID=America/Sao_Paulo:20050102T100000
+DTEND;TZID=America/Sao_Paulo:20050102T110000
+RRULE:FREQ=WEEKLY
+SUMMARY:Missa
+END:VEVENT
+BEGIN:VEVENT
 UID:cancel@x
 DTSTART;TZID=America/Sao_Paulo:${ymd(t1)}T120000
 DTEND;TZID=America/Sao_Paulo:${ymd(t1)}T130000
@@ -69,6 +83,8 @@ const assert = (c, m) => { if (!c) { console.error("FALHOU:", m); process.exitCo
 assert(titles.includes("Dentista"), "dentista");
 assert(titles.includes("Aniversário da Ana") && evs.find(e => e.title.startsWith("Aniv")).allDay, "dia todo");
 assert(titles.filter(t => t === "Hidroginástica").length >= 1, "recorrência semanal");
+assert(titles.filter(t => t === "Remédio da pressão").length === 7, "repetição diária de 2015 (milhares de voltas) aparece todo dia");
+assert(titles.filter(t => t === "Missa").length === 1, "repetição semanal de 2005 aparece na semana");
 assert(titles.includes("Evento em UTC"), "utc");
 assert(!titles.includes("Cancelado"), "cancelado some");
 assert(evs.find(e => e.title === "Dentista").start.getHours() === 9, "fuso do dentista = 9h");

@@ -16,11 +16,10 @@
   P.weather.loadCache(); P.river.loadCache(); P.alerts.loadCache(); P.cal.loadCache();
   P.settings.init(); P.view.init(); P.kiosk.init();
 
-  // dados: o tempo não depende do servidor do painel; rio e agenda esperam a detecção (rápida)
+  // dados: o tempo não depende do servidor do painel; rio, avisos e agenda esperam a detecção (rápida)
   P.cfg.loadDeploy().finally(() => {
     P.weather.refresh();
-    P.alerts.refresh();
-    P.server.detect().finally(() => { P.river.refresh(); P.cal.refresh(); });
+    P.server.detect().finally(() => { P.river.refresh(); P.alerts.refresh(); P.cal.refresh(); });
   });
 
   setInterval(P.weather.refresh, 15 * 60000);
@@ -37,6 +36,31 @@
     if (old(P.data.alerts, 8)) P.alerts.refresh();
   });
   window.addEventListener("online", () => { P.weather.refresh(); P.river.refresh(); P.alerts.refresh(); P.cal.refresh(); });
+
+  /* Versão nova: cada publicação no GitHub grava version.json. O painel confere a cada 30 min e recarrega sozinho
+     quando ninguém está olhando (em descanso ou sem toque há 5 min). Uma vez por dia também recarrega,
+     no descanso, para não acumular memória num aparelho que nunca desliga. */
+  const bootAt = Date.now();
+  let newBuild = false;
+  async function checkVersion() {
+    try {
+      const r = await P.util.fetchT("version.json?a=" + Date.now(), { cache: "no-store" }, 10000);
+      if (!r.ok) return;                                // rodando no PC: não há version.json
+      const { build } = await r.json();
+      if (!P.build) P.build = build;
+      else if (build && build !== P.build) newBuild = true;
+    } catch (e) { /* sem internet: confere depois */ }
+  }
+  function maybeReload() {
+    const daily = Date.now() - bootAt > 24 * 3600000;
+    if ((!newBuild && !daily) || !navigator.onLine || P.settings.isOpen()) return;
+    const resting = P.kiosk.isResting();
+    if (!resting && !(newBuild && P.kiosk.idleMs() >= 5 * 60000)) return;
+    P.kiosk.reload();
+  }
+  checkVersion();
+  setInterval(checkVersion, 30 * 60000);
+  P.bus.on("minute", maybeReload);
 
   // modo offline: guarda os arquivos do painel (se o navegador permitir)
   if ("serviceWorker" in navigator && /^https?:/.test(location.protocol)) {

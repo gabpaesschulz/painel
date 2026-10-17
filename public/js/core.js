@@ -2,7 +2,8 @@
 (function () {
   "use strict";
   const P = (window.P = window.P || {});
-  P.VERSION = "1.0.0";
+  P.VERSION = "2.1";
+  P.build = "";                // publicação no ar (version.json, gravado pelo GitHub); vazio no PC
 
   /* ---------- barramento de eventos ---------- */
   const handlers = {};
@@ -135,6 +136,13 @@
     if (diff === 1) return "Amanhã";
     const wd = date.toLocaleDateString("pt-BR", { weekday: short ? "short" : "long" }).replace("-feira", "").replace(".", "");
     return wd + " " + date.getDate();
+  };
+  /** De quando é um dado: "das 14:30" (hoje) · "de ontem, 14:30" · "de 12/10" */
+  U.stamp = d => {
+    const diff = U.dayDiff(d);
+    if (diff === 0) return "das " + U.fmtTime(d);
+    if (diff === -1) return "de ontem, " + U.fmtTime(d);
+    return "de " + d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   };
   /** Coloca os algarismos de um texto na fonte de números (a fonte de texto tem zero cortado) */
   U.nums = s => U.esc(s).replace(/\d+(?:[:,.]\d+)*/g, m => `<span class="num">${m}</span>`);

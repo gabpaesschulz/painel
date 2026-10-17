@@ -254,7 +254,7 @@ body::before {
 .sf-action svg { width: 1.4em; height: 1.4em; }
 .sf-action .tel { margin-left: auto; white-space: nowrap; font-size: .9em; display: flex; align-items: center; gap: .6rem; }
 .safety.alert { border-width: .45rem; }
-.safety.compact .chart, .safety.compact .sf-dc { display: none; }
+.safety.compact .chart, .safety.compact .sf-dc:not(.warn) { display: none; }
 .safety.compact .sf-body { grid-template-columns: auto; }
 .sf-stampline { font-size: calc(2.8 * var(--t)); color: var(--soft); font-weight: 500; margin-top: .9rem; white-space: nowrap; }
 

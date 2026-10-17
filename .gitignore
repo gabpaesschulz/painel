@@ -2,3 +2,5 @@
 node_modules/
 *.log
 public/_test.ics
+public/status.json
+public/version.json

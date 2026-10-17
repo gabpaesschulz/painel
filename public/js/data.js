@@ -160,6 +160,12 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   const hexColor = n => (typeof n === "string" ? n : "#" + (n >>> 0).toString(16).padStart(6, "0"));
+  const ms = s => (s ? new Date(s).getTime() || 0 : 0);
+  async function getJSON(u) {
+    const r = await U.fetchT(u + (u.includes("?") ? "&" : "?") + "a=" + Date.now(), { cache: "no-store" }, 12000);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }
   const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   /** Gravidade pelo nome oficial: 1 Normalidade · 2 Observação · 3 Atenção · 4 Alerta · 5 Alerta máximo */
   const SEV = { normalidade: 1, observacao: 2, atencao: 3, alerta: 4, "alerta maximo": 5 };
@@ -187,19 +193,13 @@
     isNear() { return kmBetween(P.cfg.get("city"), BLU) <= 80; },
     async refresh() {
       if (!P.cfg.get("river.show")) return;
-      // 1º a cópia publicada junto com o painel (renovada a cada 15 min); 2º o servidor do painel
-      const urls = ["river.json"];
-      if (P.server.ok) urls.push(P.server.base + "/api/river");
-      let best = null;
-      for (const u of urls) {
-        try {
-          const r = await U.fetchT(u + (u.includes("?") ? "&" : "?") + "a=" + Date.now(), { cache: "no-store" }, 12000);
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          const rv = buildRiver(await r.json());
-          if (!best || new Date(rv.last) > new Date(best.last)) best = rv;
-          if ((Date.now() - new Date(rv.last)) / 3600000 < 2) break;    // recente o bastante
-        } catch (e) { /* tenta a próxima fonte */ }
-      }
+      // as duas fontes ao mesmo tempo, fica a leitura mais nova:
+      // o servidor do painel (lê a Defesa Civil na hora) e a cópia publicada com o site (reserva, renovada pelo GitHub)
+      const urls = (P.server.ok ? [P.server.base + "/api/river"] : []).concat("river.json");
+      const got = await Promise.all(urls.map(async u => {
+        try { return buildRiver(await getJSON(u)); } catch (e) { return null; }
+      }));
+      const best = got.filter(Boolean).sort((a, b) => new Date(b.last) - new Date(a.last))[0] || null;
       if (best && (!P.data.river || new Date(best.last) >= new Date(P.data.river.last))) P.data.river = best;
       if (best) P.cache.set("river2", P.data.river);
       P.data.err.river = !best;
@@ -213,7 +213,8 @@
      ===================================================================== */
   const KIND = { cch: "Chuva", pes: "Deslizamento" };
   function buildAlerts(d) {
-    const kinds = (d.dados || []).map(x => ({
+    if (!d || !Array.isArray(d.dados) || !d.dados.length) throw new Error("avisos sem dados");   // vazio não é "tudo normal"
+    const kinds = d.dados.map(x => ({
       tipo: x.tipo, name: x.tipoNome, short: KIND[x.tipo] || x.tipoNome,
       regions: (x.sitregioes || []).map(sr => ({
         name: sr.regiao.nome, bairros: sr.regiao.bairros || [],
@@ -231,13 +232,21 @@
     enabled() { return P.cfg.get("alerts.show") && P.river.isNear(); },
     async refresh() {
       if (!P.alerts.enabled()) { P.data.alerts = null; P.bus.emit("data", "alerts"); return; }
-      try {
-        const r = await U.fetchT("alerts.json?a=" + Date.now(), { cache: "no-store" }, 12000);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        P.data.alerts = buildAlerts(await r.json());
-        P.cache.set("alerts", P.data.alerts);
-        P.data.err.alerts = false;
-      } catch (e) { P.data.err.alerts = true; }
+      // as duas fontes ao mesmo tempo, como no rio. "fetched" = quando alguém consultou a Defesa Civil de fato:
+      // o servidor do painel consulta na hora; para a cópia do site, quem diz é o status.json (gravado pelo GitHub).
+      const [live, copy, status] = await Promise.all([
+        P.server.ok ? getJSON(P.server.base + "/api/alerts").catch(() => null) : null,
+        getJSON("alerts.json").catch(() => null),
+        getJSON("status.json").catch(() => null),
+      ]);
+      const got = [];
+      try { if (live) got.push(Object.assign(buildAlerts(live), { fetched: new Date().toISOString() })); } catch (e) { /* formato estranho */ }
+      try { if (copy) got.push(Object.assign(buildAlerts(copy), { fetched: (status && status.alerts_at) || null })); } catch (e) { /* idem */ }
+      const best = got.sort((a, b) => ms(b.updated) - ms(a.updated) || ms(b.fetched) - ms(a.fetched))[0];
+      const cur = P.data.alerts;
+      // nunca volta no tempo (uma cópia mais velha não apaga um aviso mais novo)
+      if (best && (!cur || ms(best.updated) >= ms(cur.updated))) { P.data.alerts = best; P.cache.set("alerts", best); }
+      P.data.err.alerts = !best;
       P.bus.emit("data", "alerts");
     },
     loadCache() { const a = P.cache.get("alerts"); if (a) P.data.alerts = a; },
@@ -255,7 +264,10 @@
         const worst = pool.reduce((m, r) => (!m || r.sev > m.sev ? r : m), null);
         return worst ? { kind: k.short, tipo: k.tipo, cond: worst.cond, sev: worst.sev, region: worst.name, bg: worst.bg, fg: worst.fg } : null;
       }).filter(Boolean);
-      return { region, items, sev: items.reduce((m, i) => Math.max(m, i.sev), 1), updated: a.updated };
+      // velho: ninguém consulta a Defesa Civil há mais de 3 horas (sem internet, ou o servidor e o GitHub parados).
+      // Sem saber quando foi (cópia antiga, sem status.json), não acusa.
+      const stale = !!a.fetched && Date.now() - ms(a.fetched) > 3 * 3600000;
+      return { region, items, sev: items.reduce((m, i) => Math.max(m, i.sev), 1), updated: a.updated, fetched: a.fetched, stale };
     },
   };
 
@@ -335,8 +347,10 @@
     for (const ev of masters.values()) {
       try {
         if (ev.isRecurring()) {
+          // a série é percorrida desde o começo (pular direto para hoje mudaria a regra): um "todo dia" de anos atrás
+          // dá milhares de voltas. O teto só protege de regras absurdas (de hora em hora há décadas).
           const it = ev.iterator(); let next, n = 0;
-          while ((next = it.next()) && n++ < 800) {
+          while ((next = it.next()) && n++ < 100000) {
             if (next.toJSDate() > to) break;
             const d = ev.getOccurrenceDetails(next);
             push(d.startDate, d.endDate, d.item, ev.uid);
@@ -346,6 +360,10 @@
     }
     return out;
   };
+
+  // O endereço secreto traz todo o histórico da agenda; ler tudo a cada minuto pesa num tablet antigo.
+  // Se o Google devolveu o mesmo texto para os mesmos dias, aproveita a leitura anterior.
+  let lastICS = null;
 
   async function fetchICS(from, to) {
     const url = (P.cfg.get("calendar.icsUrl") || "").trim().replace(/^webcal:/i, "https:");
@@ -360,9 +378,13 @@
     if (!r.ok) throw new Error("O Google respondeu " + r.status + ". Confira o endereço.");
     const text = await r.text();
     if (!/BEGIN:VCALENDAR/.test(text)) throw new Error("O endereço não devolveu uma agenda.");
+    const key = url + "|" + (+from) + "|" + (+to);
+    if (lastICS && lastICS.key === key && lastICS.text === text) return lastICS.events;
     await window.icalReady;
     if (!window.ICAL) throw new Error("Não consegui carregar o leitor de agenda.");
-    return cal.parseICS(text, from, to);
+    const events = cal.parseICS(text, from, to);
+    lastICS = { key, text, events };
+    return events;
   }
 
   async function fetchGoogleApi(from, to) {

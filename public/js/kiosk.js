@@ -89,14 +89,30 @@
   P.kiosk = {
     isResting: () => resting,
     isFully: hasFully,
+    idleMs: () => Date.now() - lastAct,
     motion() { activity(); },          // chamado pelo Fully Kiosk quando detecta movimento
     restNow() { lastAct = 0; enterRest(); },
     wake,
+    /** Recarrega a página; se estava em descanso, volta direto para o descanso (sem acender a tela no meio da noite) */
+    reload() {
+      try { if (resting) sessionStorage.setItem("painel:resting", "1"); } catch (e) { /* ignora */ }
+      location.reload();
+    },
   };
 
   P.kiosk.init = function () {
     rest = document.getElementById("rest");
     setupGear();
+    // voltou de uma recarga automática feita no descanso: já começa descansando, sem o esmaecer de 1 s
+    try {
+      if (sessionStorage.getItem("painel:resting")) {
+        sessionStorage.removeItem("painel:resting");
+        lastAct = 0; resting = true;
+        rest.style.transition = "none"; rest.hidden = false; rest.classList.add("on");
+        fillRest();
+        requestAnimationFrame(() => requestAnimationFrame(() => { rest.style.transition = ""; }));
+      }
+    } catch (e) { /* ignora */ }
     ["pointerdown", "touchstart", "keydown"].forEach(ev => window.addEventListener(ev, activity, { passive: true, capture: true }));
     rest.addEventListener("pointerdown", wake);
     setInterval(checkIdle, 5000);

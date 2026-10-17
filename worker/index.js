@@ -5,11 +5,17 @@
  *  /api/ics    → entrega o seu Google Agenda (endereço secreto iCal) com permissão de CORS,
  *                já que o Google não deixa o navegador ler direto. Só aceita calendar.google.com.
  *  /api/river  → nível do rio (AlertaBLU / Defesa Civil de Blumenau), com cache de 5 min.
+ *  /api/alerts → avisos de chuva e deslizamento por região (Defesa Civil de Blumenau), com cache de 5 min.
  *  qualquer outra coisa → os arquivos do painel (pasta public/)
  *
  * Nada é guardado aqui: o endereço secreto passa pelo servidor só durante a leitura e não é registrado.
+ * O servidor da Defesa Civil manda a cadeia de certificados incompleta; o Cloudflare completa sozinho (testado em 17/10/2026).
+ * Se um dia parar, o painel usa a cópia que o GitHub publica junto com o site, e avisa quando ela ficar velha.
  */
-const RIVER_URL = "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json";
+const DEFESA_CIVIL = {
+  "/api/river": "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json",
+  "/api/alerts": "https://defesacivil.blumenau.sc.gov.br/static/data/situacao_atual.json",
+};
 const ICS_HOSTS = new Set(["calendar.google.com"]);
 
 const CORS = {
@@ -27,9 +33,9 @@ export default {
 
     if (url.pathname === "/api/ping") return json({ ok: true, app: "painel" });
 
-    if (url.pathname === "/api/river") {
+    if (DEFESA_CIVIL[url.pathname]) {
       try {
-        const r = await fetch(RIVER_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
+        const r = await fetch(DEFESA_CIVIL[url.pathname], { cf: { cacheTtl: 300, cacheEverything: true } });
         if (!r.ok) return json({ error: "upstream " + r.status }, 502);
         return new Response(r.body, { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120", ...CORS } });
       } catch (e) {

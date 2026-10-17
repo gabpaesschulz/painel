@@ -1,5 +1,6 @@
 # Publica o painel no GitHub Pages e renova a cópia do nível do rio e dos avisos da Defesa Civil a cada 15 minutos.
-# (O servidor da Defesa Civil não deixa o navegador — nem o Cloudflare — lerem direto, por isso esta cópia.)
+# A cópia é a reserva: o painel lê a Defesa Civil ao vivo pelo servidor (Cloudflare) e usa esta quando ele falhar.
+# Se o GitHub atrasar ou parar este agendamento, o painel percebe pelo status.json e avisa "sem atualizar".
 name: Publicar painel
 
 on:
@@ -26,25 +27,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Baixar nível do rio (AlertaBLU / Defesa Civil de Blumenau)
+      - name: Testes (nada vai para o tablet se falharem)
+        env:
+          TZ: America/Sao_Paulo
         run: |
-          if curl -fsSk -m 30 "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json?a=$RANDOM" -o /tmp/river.json \
-             && python3 -c "import json;d=json.load(open('/tmp/river.json'));assert d['niveis']"; then
-            cp /tmp/river.json public/river.json
-            echo "river.json atualizado"
-          else
-            echo "::warning::não consegui baixar o rio; mantendo a cópia anterior"
-          fi
-      - name: Baixar avisos da Defesa Civil (chuva e deslizamento, por região)
-        run: |
-          if curl -fsSk -m 30 "https://defesacivil.blumenau.sc.gov.br/static/data/situacao_atual.json?a=$RANDOM" -o /tmp/alerts.json \
-             && python3 -c "import json;d=json.load(open('/tmp/alerts.json'));assert d['dados']"; then
-            cp /tmp/alerts.json public/alerts.json
-            echo "alerts.json atualizado"
-          else
-            echo "::warning::não consegui baixar os avisos; mantendo a cópia anterior"
-          fi
-      - uses: actions/configure-pages@v5
+          node tools/test-ics.js
+          node tools/contrast.js
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Baixar nível do rio e avisos da Defesa Civil (AlertaBLU / Blumenau)
+        run: python3 tools/fetch_data.py "${{ steps.pages.outputs.base_url }}"
+      - name: Marcar a versão (o painel recarrega sozinho quando ela muda)
+        run: echo "{\"build\":\"${GITHUB_SHA::7}\"}" > public/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

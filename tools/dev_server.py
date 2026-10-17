@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Servidor local do painel (para testar no PC). Faz o mesmo que o Worker do Cloudflare:
-   serve a pasta public/ e oferece /api/ping, /api/ics e /api/river.
+   serve a pasta public/ e oferece /api/ping, /api/ics, /api/river e /api/alerts.
    Uso:  python tools/dev_server.py [porta]"""
 import json, os, ssl, sys, time, urllib.parse, urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
-RIVER_URL = "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json"
+DEFESA_CIVIL = {
+    "/api/river": "https://defesacivil.blumenau.sc.gov.br/static/data/nivel_oficial.json",
+    "/api/alerts": "https://defesacivil.blumenau.sc.gov.br/static/data/situacao_atual.json",
+}
 ICS_HOSTS = {"calendar.google.com"}
 # O servidor da Defesa Civil manda a cadeia de certificados incompleta; só para esse endereço não validamos.
-RIVER_CTX = ssl._create_unverified_context()
+DC_CTX = ssl._create_unverified_context()
 _cache = {}
 
 
@@ -50,9 +53,9 @@ class Handler(SimpleHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/api/ping":
             return self._send(200, {"ok": True, "app": "painel"})
-        if u.path == "/api/river":
+        if u.path in DEFESA_CIVIL:
             try:
-                return self._send(200, cached("river", 120, lambda: get(RIVER_URL, RIVER_CTX)))
+                return self._send(200, cached(u.path, 120, lambda: get(DEFESA_CIVIL[u.path], DC_CTX)))
             except Exception as e:
                 return self._send(502, {"error": str(e)})
         if u.path == "/api/ics":

@@ -48,6 +48,8 @@ Fonte: [Fully Kiosk — documentação](https://www.fully-kiosk.com/en/)
 | Movimento só na entrada e nos ícones (desligáveis); nada pisca | calma visual |
 | Fontes e ícones empacotados localmente | abre mesmo sem internet |
 | Se a internet cair, mostra o último dado salvo e um aviso discreto | não deixa a tela vazia |
+| Dado velho nunca parece novo: rio e Defesa Civil dizem de quando é o dado, e aviso velho não vira "tudo normal" | num painel de segurança, a calma falsa é o pior erro |
+| Versões novas entram sozinhas, durante o descanso | ninguém na casa precisa mexer no tablet |
 
 ## Revisão v2: de "7" para o máximo possível sem testar com o usuário
 

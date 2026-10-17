@@ -297,7 +297,7 @@
       let stamp = P.data.err.river ? "Sem dados agora" : "Buscando…";
       if (r) {
         const when = new Date(r.last), ageH = (Date.now() - when) / 3600000;
-        stamp = ageH > 3 ? `⚠ Dado antigo, das ${N(U.fmtTime(when))}` : `Leitura das ${N(U.fmtTime(when))}`;
+        stamp = ageH > 3 ? `⚠ Dado antigo, ${U.nums(U.stamp(when))}` : `Leitura das ${N(U.fmtTime(when))}`;
       }
       // normal: selo discreto (bolinha + palavra); a partir de "Observação": selo cheio na cor oficial
       const badge = !r ? "" : r.sev <= 1
@@ -320,9 +320,13 @@
     if (st) {
       const bad = st.items.filter(i => i.sev > 1).sort((a, b) => b.sev - a.sev);
       const where = st.region ? "no seu bairro" : "em Blumenau";
+      // dado velho nunca vira "tudo normal": diz que está sem atualizar e de quando é
+      const old = st.stale ? `<b>sem atualizar</b> · último dado ${U.nums(U.stamp(new Date(st.fetched)))}` : "";
       dc = bad.length
-        ? `<div class="sf-dc"><span class="dot" style="background:${bad[0].bg}"></span><span>Defesa Civil: ` +
-            bad.map(i => `${i.kind.toLowerCase()} em <b>${U.esc(i.cond.toLowerCase())}</b>${st.region ? "" : " na região " + U.esc(i.region)}`).join(" · ") + `</span></div>`
+        ? `<div class="sf-dc ${old ? "warn" : ""}"><span class="dot" style="background:${bad[0].bg}"></span><span>Defesa Civil: ` +
+            bad.map(i => `${i.kind.toLowerCase()} em <b>${U.esc(i.cond.toLowerCase())}</b>${st.region ? "" : " na região " + U.esc(i.region)}`).join(" · ") +
+            (old ? " · " + old : "") + `</span></div>`
+        : old ? `<div class="sf-dc warn">${P.ui("wifi-off")}<span>Defesa Civil: ${old}</span></div>`
         : `<div class="sf-dc"><span class="dot" style="background:#64EE64"></span><span>Defesa Civil: <b>tudo normal</b> ${where}</span></div>`;
     }
 

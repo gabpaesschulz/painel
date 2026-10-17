@@ -152,7 +152,8 @@
         row("Mostrar avisos", "Condições de chuva e risco de deslizamento, por região de Blumenau. Quando passa de “Atenção”, o painel mostra o aviso em destaque com o telefone 199.", toggle("alerts.show")) +
         (P.cfg.get("alerts.show") ? row("Seu bairro", "Para mostrar só o que vale para a sua região.",
           a ? `<select class="sel" data-bind="alerts.bairro" style="max-width:100%"><option value="">Não informar (mostrar a cidade toda)</option>${opts}</select>` : callout("", "Carregando a lista de bairros…"), "col") : "") +
-        (st && st.items.length ? `<dl class="kv" style="margin-top:.8em">${st.items.map(i => `<dt>${esc(i.kind)}</dt><dd>${esc(i.cond)}${st.region ? "" : " (região " + esc(i.region) + ")"}</dd>`).join("")}</dl>` : "")) +
+        (st && st.items.length ? `<dl class="kv" style="margin-top:.8em">${st.items.map(i => `<dt>${esc(i.kind)}</dt><dd>${esc(i.cond)}${st.region ? "" : " (região " + esc(i.region) + ")"}</dd>`).join("")}` +
+          (st.fetched ? `<dt>Consultado</dt><dd>${new Date(st.fetched).toLocaleString("pt-BR")}${st.stale ? " — antigo" : ""}</dd>` : "") + `</dl>` : "")) +
       sec("Como ler", `<p class="help">Faixas oficiais do rio: <b>Normalidade</b> até 3 m · <b>Observação</b> de 3 a 4 m · <b>Atenção</b> de 4 a 6 m · <b>Alerta</b> de 6 a 8 m · <b>Alerta máximo</b> acima de 8 m. Em emergência, ligue <b>199</b> (Defesa Civil).</p>`);
   }
 
@@ -186,7 +187,7 @@
         `<div class="btns"><button class="btn" data-act="copyCode">${P.ui("clipboard-copy")} Gerar e copiar</button><button class="btn primary" data-act="applyCode">${P.ui("download")} Aplicar</button></div>`) +
       sec("Manutenção",
         `<div class="btns"><button class="btn" data-act="reload">${P.ui("refresh-cw")} Recarregar o painel</button><button class="btn danger" data-act="reset">Voltar ao padrão</button></div>`) +
-      sec("Sobre", `<p class="help">Painel ${P.VERSION}. Previsão: Open-Meteo. Rio: AlertaBLU / Defesa Civil de Blumenau. Ícones de tempo: Meteocons (MIT). Ícones: Lucide (ISC). Fontes: Fraunces, Atkinson Hyperlegible Next, Lexend, Literata (OFL).</p>`);
+      sec("Sobre", `<p class="help">Painel ${P.VERSION}${P.build ? ` (publicação ${esc(P.build)})` : ""}. Versões novas entram sozinhas, quando o painel está em descanso. Previsão: Open-Meteo. Rio: AlertaBLU / Defesa Civil de Blumenau. Ícones de tempo: Meteocons (MIT). Ícones: Lucide (ISC). Fontes: Fraunces, Atkinson Hyperlegible Next, Lexend, Literata (OFL).</p>`);
   }
 
   const BUILD = { look: tabLook, city: tabCity, agenda: tabAgenda, rem: tabRem, river: tabRiver, screen: tabScreen, adv: tabAdv };
@@ -249,7 +250,7 @@
           : callout("ok", `✔ <b>A agenda está ligada e foi lida.</b> Mas não há nenhum compromisso marcado nos próximos ${P.cfg.get("calendar.daysAhead")} dias, por isso o painel mostra “Nada marcado”. Crie um evento para amanhã e toque em <b>Testar agora</b> de novo.`);
         P.cal.refresh();
       } else {
-        await P.river.refresh();
+        await Promise.all([P.river.refresh(), P.alerts.refresh()]);
         testBox.river = P.data.err.river ? callout("bad", "✖ Não consegui ler o nível do rio agora.") : callout("ok", "✔ Nível do rio atualizado.");
       }
     } catch (e) { testBox[kind] = callout("bad", "✖ " + esc(e.message || "Não funcionou")); }

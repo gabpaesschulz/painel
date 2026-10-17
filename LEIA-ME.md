@@ -7,11 +7,11 @@ painel/
 ├─ public/            ← o painel (é isto que vai para o tablet)
 │  ├─ index.html, css/, js/, assets/ (fontes, ícones), vendor/
 │  ├─ deploy.json     ← endereço do servidor e padrões do primeiro uso
-│  ├─ river.json      ← cópia do nível do rio (renovada a cada 15 min)
-│  └─ alerts.json     ← cópia dos avisos da Defesa Civil (renovada a cada 15 min)
-├─ worker/index.js    ← servidor gratuito (Cloudflare) que libera o Google Agenda
-├─ tools/             ← servidor local, testes e verificação de contraste
-├─ .github/workflows/ ← publica no GitHub Pages e renova o rio a cada 15 min
+│  ├─ river.json      ← cópia de reserva do nível do rio (o GitHub renova a cada 15 min)
+│  └─ alerts.json     ← cópia de reserva dos avisos da Defesa Civil (idem)
+├─ worker/index.js    ← servidor gratuito (Cloudflare): Google Agenda e Defesa Civil ao vivo
+├─ tools/             ← servidor local, testes, verificação de contraste e o download da Defesa Civil
+├─ .github/workflows/ ← testa, publica no GitHub Pages e renova as cópias a cada 15 min
 ├─ iniciar.bat        ← abre o painel no seu PC (para testar)
 └─ DESIGN.md          ← pesquisa e decisões de design (com fontes)
 ```
@@ -39,8 +39,8 @@ O tablet precisa abrir o painel por um endereço na internet. São duas peças g
 
 | Peça | Para quê | Onde |
 |---|---|---|
-| **Site** (GitHub Pages) | hospeda o painel e renova o nível do rio e os avisos a cada 15 min | GitHub |
-| **Servidor da agenda** (Cloudflare Worker) | deixa o painel ler o seu Google Agenda | Cloudflare |
+| **Site** (GitHub Pages) | hospeda o painel e guarda uma cópia de reserva do rio e dos avisos | GitHub |
+| **Servidor da agenda** (Cloudflare Worker) | deixa o painel ler o seu Google Agenda e lê o rio e os avisos da Defesa Civil na hora | Cloudflare |
 
 ### 2.1 Site no GitHub Pages
 1. Crie um repositório **público** no GitHub e envie esta pasta.
@@ -48,7 +48,11 @@ O tablet precisa abrir o painel por um endereço na internet. São duas peças g
 3. Na aba **Actions**, rode **Publicar painel** uma vez (depois roda sozinho a cada 15 min).
 4. O endereço fica algo como `https://SEU-USUARIO.github.io/painel/`.
 
-> Por que o rio passa pelo GitHub? O servidor da Defesa Civil de Blumenau manda o certificado incompleto: o navegador não pode ler direto (sem CORS) e o Cloudflare também recusa. O job do GitHub baixa o arquivo e o publica junto com o painel.
+> **De onde vêm o rio e os avisos.** O navegador não pode ler a Defesa Civil direto: falta permissão (CORS) e o servidor deles manda a cadeia de certificados incompleta. Por isso o painel busca **duas fontes ao mesmo tempo** e fica com a mais nova: o servidor do Cloudflare (`/api/river` e `/api/alerts`, que leem na hora; o Cloudflare completa o certificado sozinho, testado em 17/10/2026) e a cópia que o GitHub publica junto com o site a cada 15 min (`tools/fetch_data.py`).
+>
+> Se as duas pararem, o painel não finge que está tudo bem: o rio mostra "Dado antigo" e os avisos mostram "sem atualizar", sempre com a hora do último dado. Para saber quando o GitHub baixou pela última vez, abra `…/painel/status.json`.
+>
+> O agendamento do GitHub atrasa às vezes e **é desligado sozinho depois de 60 dias sem commits** (repositório público). Se isso acontecer, entre em **Actions → Publicar painel → Enable workflow**. Enquanto isso, o servidor do Cloudflare continua dando conta.
 
 ### 2.2 Servidor da agenda (Cloudflare Worker)
 1. Crie uma conta gratuita em cloudflare.com.
@@ -61,6 +65,8 @@ O tablet precisa abrir o painel por um endereço na internet. São duas peças g
    (Dá para pôr em `"defaults"` também a cidade, o tema etc. do primeiro uso.) Faça o commit; o site se atualiza sozinho.
 
 O Worker só aceita endereços `calendar.google.com/calendar/ical/…` e não guarda nada.
+
+Sempre que `worker/index.js` mudar, rode `npx wrangler deploy` de novo (o GitHub não publica o Worker).
 
 ## 3. Ligar o Google Agenda
 
@@ -78,7 +84,7 @@ Instale o **Fully Kiosk Browser** (a versão grátis basta). Os nomes das opçõ
 - **Web Content Settings → Start URL:** o endereço do painel.
 - **Fullscreen Mode** ligado; **Show Action Bar** e **Show Address Bar** desligados.
 - **Device Management → Keep Screen On** ligado.
-- Para pegar uma versão nova do painel: deslize da borda esquerda → **Load Start URL**.
+- **Versões novas entram sozinhas:** o painel confere a cada 30 min e recarrega quando está em descanso (ou sem toque há 5 min), e volta direto para o descanso. Uma vez por dia também recarrega no descanso, para não acumular memória. Para forçar na hora: deslize da borda esquerda → **Load Start URL**.
 
 Opcional, com licença PLUS (paga): *Motion Detection* acende a tela quando alguém passa, e *Enable JavaScript Interface* faz o painel sair do descanso junto. Sem isso, um toque na tela acorda.
 
@@ -97,17 +103,21 @@ Sem Fully, abra no Chrome → ⋮ → **Adicionar à tela inicial** (abre em tel
 ## 6. Testes
 
 ```
-node tools/test-ics.js        # leitor de agenda (.ics, repetições, fusos, cancelados)
+node tools/test-ics.js        # leitor de agenda (.ics, repetições antigas e novas, fusos, cancelados)
 node tools/contrast.js        # contraste WCAG de todos os temas (texto ≥ 7:1)
 node tools/make-fixture.js    # gera uma agenda de teste com datas de hoje
+python tools/fetch_data.py    # baixa o rio e os avisos para public/ (o que o GitHub faz a cada 15 min)
 ```
+
+O GitHub roda os dois primeiros antes de cada publicação. Se algum falhar, nada vai para o tablet (e a cópia do rio e dos avisos para de ser renovada até corrigir, por isso o painel passa a avisar "sem atualizar").
 
 ## 7. O que foi e o que não foi testado
 
 - **Testado com capturas automáticas:** 5 temas; telas 16:10, 2:1 e 4:3; letras A+++ com layout espelhado; manhã, noite e madrugada; dia escolhido na faixa da semana; agenda vazia; feriado hoje e amanhã; compromisso em andamento; títulos longos; rio em "Atenção" e "Alerta máximo" com a cota da rua; avisos de deslizamento por bairro; descanso com e sem alerta; configurações (bairro, cota com vírgula, cidade). Leitor de agenda `.ics` e contraste de todos os temas por script.
 - **Testado no uso real:** site no GitHub Pages, servidor na Cloudflare, Google Agenda pelo endereço secreto, Fully Kiosk no tablet.
 - **Não testado:** com os usuários finais; o painel numa cheia de verdade (os alertas foram simulados alterando os dados oficiais); os eventos de movimento do Fully (exigem a licença PLUS).
-- O nível do rio depende do que a Defesa Civil publica. Se a leitura ficar com mais de 3 horas, o painel avisa "Dado antigo".
+- **Testado com o Chrome sem janela (17/10/2026):** avisos da Defesa Civil sem atualizar há 26 h, com e sem alerta (inclusive no modo compacto); avisos lidos ao vivo pelo servidor; versão nova chegando durante o descanso (recarrega e volta descansando). O download do GitHub foi testado com a Defesa Civil fora do ar, com e sem cópia publicada.
+- O nível do rio depende do que a Defesa Civil publica. Se a leitura ficar com mais de 3 horas, o painel avisa "Dado antigo". Os avisos também: se ninguém conseguir consultar a Defesa Civil há mais de 3 horas, aparece "sem atualizar" no lugar de "tudo normal".
 
 ## Créditos
 Previsão: Open-Meteo. Rio: AlertaBLU / Defesa Civil de Blumenau. Ícones do tempo: [Meteocons](https://github.com/basmilius/meteocons) (MIT). Ícones: [Lucide](https://lucide.dev) (ISC). Fontes (licença OFL): Fraunces, Atkinson Hyperlegible Next, Lexend, Literata. Leitor de agenda: [ical.js](https://github.com/kewisch/ical.js) (MPL 2.0).
