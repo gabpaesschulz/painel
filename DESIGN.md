@@ -1,6 +1,6 @@
 # Pesquisa e decisões de design
 
-> Versão 2 (17/10/2026). O que mudou da v1 para a v2 está na seção **Revisão v2**, no fim.
+> Versão 2.2 (23/10/2026). O que mudou da v1 para a v2 está na seção **Revisão v2**; o acabamento da 2.2, na **Revisão v3**, no fim.
 
 Público: pessoas idosas, uma delas com baixa visão após AVC isquêmico. Uso: tablet parado, olhada rápida, sem precisar "operar".
 
@@ -45,7 +45,7 @@ Fonte: [Fully Kiosk — documentação](https://www.fully-kiosk.com/en/)
 | Lado do relógio configurável | perda de visão de um lado; sem guia específico na literatura |
 | Descanso: tela escura, relógio discreto, desloca 1–3 px por minuto | economiza energia, evita imagem fixa |
 | Engrenagem discreta, só abre segurando 1 s | pais não abrem sem querer |
-| Movimento só na entrada e nos ícones (desligáveis); nada pisca | calma visual |
+| Movimento só na entrada, nos ícones, na troca do minuto e na luz que segue o sol (tudo desligável); nada pisca | calma visual |
 | Fontes e ícones empacotados localmente | abre mesmo sem internet |
 | Se a internet cair, mostra o último dado salvo e um aviso discreto | não deixa a tela vazia |
 | Dado velho nunca parece novo: rio e Defesa Civil dizem de quando é o dado, e aviso velho não vira "tudo normal" | num painel de segurança, a calma falsa é o pior erro |
@@ -93,3 +93,25 @@ Fonte: [Fully Kiosk — documentação](https://www.fully-kiosk.com/en/)
 - Nenhuma decisão foi testada com os usuários finais. O passo de maior valor agora é observar o uso por alguns dias e anotar onde eles hesitam.
 - A cota de enchente da rua depende de alguém saber o número (Mapa de Inundação da Defesa Civil).
 - A Defesa Civil não publica previsão do nível do rio em formato aberto; o gráfico mostra só o que já aconteceu.
+
+## Revisão v3: acabamento (2.2)
+
+Contexto: duas semanas de uso real, aprovado pela família. Pedido: deixar a experiência mais "premium", sem perder nada do que funciona.
+
+**O que não mudou, de propósito.** O mapa da tela (agora à esquerda, o que vem à direita), os tamanhos mínimos, a ordem de sacrifício e as palavras. Depois de duas semanas, os usuários já sabem onde olhar; mudar a posição das coisas custaria mais do que qualquer ganho de estética.
+
+| Antes | Agora | Por quê |
+|---|---|---|
+| Âmbar em tudo (saudação, dia da semana, títulos, rótulos da lista) | Um destaque só: **hoje**, o **horário do próximo compromisso**, a contagem e os avisos | com a cor espalhada, nada se destaca; os rótulos passam para o tom suave (≥ 7:1 do mesmo jeito) |
+| Cartões com contorno | Vidro: degradê leve, fio de luz no alto, sombra longa e macia; faixas da semana e das próximas horas viram uma régua só, com divisórias finas | menos linhas na tela; a profundidade separa os blocos |
+| Céu fixo por faixa de hora | **A luz segue o sol**: nasce à esquerda, passa alta ao meio-dia e se põe à direita (horários reais da Open-Meteo); de noite, uma lua fria e fraca; com chuva, a luz enfraquece | orientação no tempo sem nenhum texto a mais; mexe a cada 5 min, em 5 s, para não gastar o tablet. Cores saturadas e escuras (pastéis no Papel) e força medida em capturas: no pior horário (sol limpo atrás do texto), texto ≥ 9:1 e rótulos suaves ≥ 7:1 em todos os temas; na v2, o brilho do canto do rio já derrubava para 6,9:1 e 4,9:1 |
+| Relógio | Maior, dois-pontos na cor do destaque, algarismos com um leve tom quente embaixo; o algarismo que muda entra de cima em 1 s | o relógio é a peça principal; a troca do minuto é a única animação recorrente, uma vez por minuto |
+| Tempo agora em quatro linhas | Ícone · temperatura · palavras na mesma linha | o espaço ganho foi para o relógio |
+| Frase amiga solta | Vira um cartãozinho quando pede uma ação ("leve o guarda-chuva"); fica só o texto quando é calma ("sem chuva prevista") | o que pede ação ganha peso |
+| "Hoje · daqui a 5 horas" | "Hoje" + selo "daqui a 5 horas"; se está acontecendo, só o selo "acontecendo agora, até 16:30" | a contagem é o que a pessoa procura |
+| Gráfico do rio com linha reta entre leituras | Curva suave que não inventa picos (monotônica), área que some para baixo, ponto de "agora" com halo | mais fácil de ler a tendência |
+| Descanso: hora, data, próximo | + o tempo de agora (só se a leitura tiver menos de 3 h), um fio separando o próximo compromisso, uma luz quente bem fraca embaixo | de manhã, a primeira olhada já responde "como está lá fora" |
+| Descanso só termina com toque | **Acorda sozinho de manhã** e fica aceso até alguém usar | pedido da família: o painel não "acordava" |
+
+Alto contraste continua sem vidro nem brilho, com contorno nos botões. O modo leve desliga o desfoque, a textura e a luz andando.
+

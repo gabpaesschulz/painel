@@ -16,6 +16,7 @@
       days: dly.time.map((t, i) => ({
         date: t, code: dly.weather_code[i], max: dly.temperature_2m_max[i], min: dly.temperature_2m_min[i],
         pop: dly.precipitation_probability_max[i], uv: dly.uv_index_max[i],
+        rise: dly.sunrise ? dly.sunrise[i] : null, set: dly.sunset ? dly.sunset[i] : null,
       })),                                   // days[0] = hoje
       hourly: { t: hr.time, temp: hr.temperature_2m, code: hr.weather_code, pop: hr.precipitation_probability },
     };
@@ -36,7 +37,7 @@
         `?latitude=${c.lat}&longitude=${c.lon}&timezone=${encodeURIComponent(c.tz || "auto")}` +
         "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
         "&hourly=temperature_2m,weather_code,precipitation_probability" +
-        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max" +
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,sunrise,sunset" +
         "&forecast_days=8";
       try {
         const r = await U.fetchT(url, {}, 15000);

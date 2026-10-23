@@ -1,10 +1,20 @@
-/* Modo quiosque: descanso (tela escura e discreta), acordar por toque/movimento (Fully Kiosk), botão de configurações. */
+/* Modo quiosque: descanso (tela escura e discreta), acordar por toque/movimento (Fully Kiosk) e sozinho de manhã,
+   botão de configurações. */
 (function () {
   "use strict";
   const P = window.P, U = P.util;
-  let rest, resting = false, lastAct = Date.now(), fullyOn = false;
+  let rest, resting = false, restAt = 0, lastAct = Date.now(), fullyOn = false;
+  let morning = false;          // acordou sozinho de manhã: fica aceso até alguém usar (ou até a noite)
 
   const hasFully = () => typeof window.fully !== "undefined";
+
+  /** Quando terminou a última noite (a hora "Até" do modo noite), em relação a agora */
+  function lastNightEnd(now) {
+    const [h, m] = U.parseHM(P.cfg.get("rest.nightEnd"));
+    const d = new Date(now); d.setHours(h, m, 0, 0);
+    if (d > now) d.setDate(d.getDate() - 1);
+    return d.getTime();
+  }
 
   function idleLimitMs() {
     const r = P.cfg.get("rest");
@@ -18,6 +28,10 @@
     U.$(".rt", rest).innerHTML = P.view.clockHTML(now);
     const wd = now.toLocaleDateString("pt-BR", { weekday: "long" });
     U.$(".rd", rest).innerHTML = U.cap(wd) + ", " + U.nums(now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" }));
+    // o tempo de agora (ícone parado); se a leitura for velha, não mostra
+    const w = P.data.weather, info = w && Date.now() - w.at < 3 * 3600000 ? P.wmo(w.now.code, w.now.isDay) : null;
+    U.$(".rw", rest).innerHTML = info
+      ? `<img src="assets/icons/static/${info.icon}.svg" alt="" draggable="false"><span class="num">${Math.round(w.now.temp)}°</span><span>${info.text}</span>` : "";
     const next = P.cal.upcoming().find(e => e.kind !== "holiday");
     U.$(".rn", rest).innerHTML = next
       ? `Próximo: ${U.esc(next.title)} · ${U.nums(P.view.longDay(P.view.shownDay(next)))}${next.allDay ? "" : " às " + U.nums(U.fmtTime(next.start))}`
@@ -35,7 +49,7 @@
 
   function enterRest() {
     if (resting || (P.settings && P.settings.isOpen())) return;
-    resting = true;
+    resting = true; restAt = Date.now(); morning = false;
     fillRest();
     rest.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => rest.classList.add("on")));
@@ -52,10 +66,15 @@
     P.bus.emit("wake");
   }
 
-  function activity() { lastAct = Date.now(); if (resting) wake(); }
+  function activity() { lastAct = Date.now(); morning = false; if (resting) wake(); }
 
   function checkIdle() {
     if (P.view.safetyState().sev >= 4) { if (resting) wake(); return; }   // em alerta, o painel fica inteiro na tela
+    const now = new Date(), night = P.view.isNight(now), r = P.cfg.get("rest");
+    // de manhã: descansando desde antes do fim da noite → acorda sozinho (vale também depois de uma recarga ou
+    // se o tablet "cochilou" e o painel só voltou a rodar mais tarde)
+    if (resting && !night && r.night && r.morningWake && restAt < lastNightEnd(now)) { wake(); morning = true; return; }
+    if (morning && !night) return;                     // ninguém viu ainda: não volta ao descanso por falta de toque
     const lim = idleLimitMs();
     if (lim && !resting && Date.now() - lastAct >= lim) enterRest();
   }
@@ -95,7 +114,10 @@
     wake,
     /** Recarrega a página; se estava em descanso, volta direto para o descanso (sem acender a tela no meio da noite) */
     reload() {
-      try { if (resting) sessionStorage.setItem("painel:resting", "1"); } catch (e) { /* ignora */ }
+      try {
+        if (resting) sessionStorage.setItem("painel:resting", String(restAt));
+        if (morning) sessionStorage.setItem("painel:morning", "1");
+      } catch (e) { /* ignora */ }
       location.reload();
     },
   };
@@ -105,13 +127,16 @@
     setupGear();
     // voltou de uma recarga automática feita no descanso: já começa descansando, sem o esmaecer de 1 s
     try {
-      if (sessionStorage.getItem("painel:resting")) {
+      const since = sessionStorage.getItem("painel:resting");
+      if (since) {
         sessionStorage.removeItem("painel:resting");
         lastAct = 0; resting = true;
+        restAt = +since > 1e12 ? +since : Date.now();      // versões antigas gravavam só "1"
         rest.style.transition = "none"; rest.hidden = false; rest.classList.add("on");
         fillRest();
         requestAnimationFrame(() => requestAnimationFrame(() => { rest.style.transition = ""; }));
       }
+      if (sessionStorage.getItem("painel:morning")) { sessionStorage.removeItem("painel:morning"); morning = !resting; }
     } catch (e) { /* ignora */ }
     ["pointerdown", "touchstart", "keydown"].forEach(ev => window.addEventListener(ev, activity, { passive: true, capture: true }));
     rest.addEventListener("pointerdown", wake);

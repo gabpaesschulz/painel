@@ -71,11 +71,13 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def log_message(self, fmt, *args):
-        if "/api/" in (args[0] if args else ""):
+        if "/api/" in (str(args[0]) if args else ""):
             sys.stderr.write("  " + (fmt % args) + "\n")
 
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     print(f"Painel no ar em  http://localhost:{port}/   (Ctrl+C para parar)")
+    # fila maior: o navegador abre várias conexões de uma vez e, no Windows, a fila padrão (5) recusa algumas
+    ThreadingHTTPServer.request_queue_size = 64
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

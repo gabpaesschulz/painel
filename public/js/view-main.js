@@ -27,7 +27,29 @@
     if (meta) meta.content = getComputedStyle(html).getPropertyValue("--bg").trim() || "#000";
   }
 
-  const skyFor = h => (h >= 5 && h < 8 ? "dawn" : h >= 8 && h < 17 ? "day" : h >= 17 && h < 20 ? "dusk" : "night");
+  /* ---------- céu: a luz da tela segue o sol de verdade (nascer e pôr do sol da previsão) ---------- */
+  const hm = (s, dflt) => { const m = /T(\d\d):(\d\d)/.exec(s || ""); return m ? +m[1] * 60 + +m[2] : dflt; };
+  const wxKind = c => (c >= 95 ? "storm" : P.isRainy(c) ? "rain" : c >= 3 ? "cloud" : "clear");
+  let skyAt = -1;
+  function updateSky(now, force) {
+    const m = now.getHours() * 60 + now.getMinutes();
+    if (!force && skyAt >= 0 && Math.abs(m - skyAt) < 5) return;       // o sol anda devagar: mexe a cada 5 min
+    const first = skyAt < 0;
+    skyAt = m;
+    const w = P.data.weather, today = P.weather.day(w, now) || {};
+    const rise = hm(today.rise, 360), set = hm(today.set, 1080);         // sem previsão: 6 h e 18 h
+    // aurora: da hora antes à hora depois do nascer · dourado: a hora antes do pôr · crepúsculo: a hora depois
+    html.dataset.sky = m < rise - 60 || m >= set + 60 ? "night" : m < rise + 60 ? "dawn" : m < set - 60 ? "day" : m < set ? "golden" : "dusk";
+    // nasce à esquerda, passa alto ao meio-dia e se põe à direita; de noite a lua faz o mesmo caminho, mais fraca
+    const p = m >= rise && m <= set ? (m - rise) / (set - rise) : ((m - set + 1440) % 1440) / (1440 - (set - rise));
+    html.style.setProperty("--sx", (6 + p * 88).toFixed(1));
+    html.style.setProperty("--sy", (80 - Math.sin(Math.PI * p) * 72).toFixed(1));
+    html.dataset.wx = w ? wxKind(w.now.code) : "clear";
+    // ao abrir (ou redesenhar), o sol já aparece no lugar, sem atravessar a tela
+    const sun = document.querySelector("#sky .sun");
+    if (first && sun) { sun.style.transition = "none"; requestAnimationFrame(() => requestAnimationFrame(() => { sun.style.transition = ""; })); }
+  }
+
   function isNight(now) {
     const r = P.cfg.get("rest");
     if (!r.night) return false;
@@ -54,13 +76,20 @@
   /* =====================================================================
      RELÓGIO
      ===================================================================== */
-  let lastTime = "", lastMinute = -1;
+  let lastTime = "", lastMinute = -1, lastClock = "";
   function tick() {
     const now = new Date(), c = P.cfg.all();
-    let t = clockHTML(now);
-    if (!c.clock24) t += `<span class="ampm">${now.getHours() < 12 ? "AM" : "PM"}</span>`;
-    if (c.showSeconds) t += `<span class="sec">${U.pad(now.getSeconds())}</span>`;
-    if (t !== lastTime) { el.time.innerHTML = t; lastTime = t; }
+    const clock = U.fmtTime(now);
+    let extra = "";
+    if (!c.clock24) extra += `<span class="ampm">${now.getHours() < 12 ? "AM" : "PM"}</span>`;
+    if (c.showSeconds) extra += `<span class="sec">${U.pad(now.getSeconds())}</span>`;
+    if (clock + extra !== lastTime) {
+      // o algarismo novo entra devagar, de cima (uma vez por minuto; nada pisca)
+      const roll = c.motion && !c.lite && lastClock.length === clock.length;
+      el.time.innerHTML = [...clock].map((ch, i) => ch === ":" ? `<span class="colon">:</span>`
+        : `<span class="dg${roll && lastClock[i] !== ch ? " roll" : ""}">${ch}</span>`).join("") + extra;
+      lastTime = clock + extra; lastClock = clock;
+    }
     if (now.getMinutes() !== lastMinute) { lastMinute = now.getMinutes(); minute(now); }
   }
   function minute(now) {
@@ -71,7 +100,7 @@
     const hol = P.holidays(U.startOfDay(now), U.addDays(U.startOfDay(now), 1))[0];
     el.todayHoliday.hidden = !hol;
     if (hol) el.todayHoliday.innerHTML = P.ui("star") + `<span>Feriado: ${U.esc(hol.title)}</span>`;
-    html.dataset.sky = skyFor(h);
+    updateSky(now);
     html.dataset.night = isNight(now) ? "1" : "0";
     renderAhead(); renderSafety();
     layout();
@@ -85,17 +114,17 @@
     const w = P.data.weather;
     if (!w) {
       el.wxNow.className = "now loading";
-      el.wxNow.innerHTML = `<div class="ico"></div><div><div class="temp disp">--°</div><div class="desc">Buscando a previsão…</div></div>`;
+      el.wxNow.innerHTML = `<div class="ico"></div><div class="temp disp">--°</div><div class="wxd"><div class="desc">Buscando a previsão…</div></div>`;
       el.wxHint.innerHTML = "";
       return;
     }
     el.wxNow.className = "now";
     const info = P.wmo(w.now.code, w.now.isDay), today = P.weather.day(w, new Date());
-    const feels = Math.abs(w.now.feels - w.now.temp) >= 3 ? `<div class="feels">Sensação de ${N(r0(w.now.feels) + "°")}</div>` : "";
-    const range = today ? `<div class="range"><span class="mx">Máx ${N(r0(today.max) + "°")}</span> · <span class="mn">Mín ${N(r0(today.min) + "°")}</span></div>` : "";
+    const feels = Math.abs(w.now.feels - w.now.temp) >= 3 ? `<div class="feels">Sensação ${N(r0(w.now.feels) + "°")}</div>` : "";
+    const range = today ? `<div class="range"><span class="mx">Máx ${N(r0(today.max) + "°")}</span><span class="mn">Mín ${N(r0(today.min) + "°")}</span></div>` : "";
     el.wxNow.innerHTML =
       `<div class="ico">${P.wxImg(info.icon)}</div>` +
-      `<div><div class="temp disp">${r0(w.now.temp)}°</div><div class="desc">${info.text}</div>${range}${feels}</div>`;
+      `<div class="temp disp">${r0(w.now.temp)}°</div><div class="wxd"><div class="desc">${info.text}</div>${range}${feels}</div>`;
     const h = P.cfg.get("hint") ? P.weather.hint(w) : null;
     el.wxHint.innerHTML = h ? `<div class="hint ${h.ui ? "calm" : ""}">${h.ui ? P.ui(h.ui, "hu") : P.wxImg(h.icon, "hi")}<span>${U.nums(h.text)}</span></div>` : "";
   }
@@ -202,7 +231,8 @@
     el.agenda.innerHTML =
       `<div class="feat">${time}<div class="fb"><div class="fl">${label}</div>` +
       `<div class="fn">${U.esc(first.title)}</div>` + (first.loc ? `<div class="floc">${U.esc(first.loc)}</div>` : "") +
-      `<div class="fs">${U.nums(longDay(shownDay(first)))}${cdown ? " · " + U.nums(cdown) : ""}</div></div></div>` +
+      // acontecendo agora: o "Agora" do rótulo já diz o dia; fica só o selo com até quando
+      `<div class="fs">${isNow && cdown ? "" : `<span>${U.nums(longDay(shownDay(first)))}</span>`}${cdown ? `<span class="cd">${U.nums(cdown)}</span>` : ""}</div></div></div>` +
       `<div class="list">` + (rest.length
         ? rest.map(e => `<div class="row ${e.kind === "holiday" ? "holiday" : ""}"><span class="d">${U.nums(U.dayLabel(shownDay(e), true))}</span>` +
             `<span class="t">${evTime(e)}</span><span class="n">${evName(e)}</span></div>`).join("")
@@ -313,23 +343,24 @@
 
     let head, body = "";
     if (showR) {
-      let stamp = P.data.err.river ? "Sem dados agora" : "Buscando…";
+      let stamp = P.data.err.river ? "Sem dados agora" : "Buscando…", old = !r;
       if (r) {
         const when = new Date(r.last), ageH = (Date.now() - when) / 3600000;
-        stamp = ageH > 3 ? `⚠ Dado antigo, ${U.nums(U.stamp(when))}` : `Leitura das ${N(U.fmtTime(when))}`;
+        old = ageH > 3;
+        stamp = old ? `⚠ Dado antigo, ${U.nums(U.stamp(when))}` : `Leitura das ${N(U.fmtTime(when))}`;
       }
       // normal: selo discreto (bolinha + palavra); a partir de "Observação": selo cheio na cor oficial
       const badge = !r ? "" : r.sev <= 1
         ? `<span class="badge quiet"><i style="background:${r.cond.bg}"></i>${U.esc(r.cond.name)}</span>`
         : `<span class="badge" style="background:${r.cond.bg};color:${r.cond.fg}">${U.esc(r.cond.name)}</span>`;
-      head = `<div class="sf-head"><span class="kicker">Rio Itajaí-Açu</span><span class="right"><span class="sf-stamp">${stamp}</span>${badge}</span></div>`;
+      head = `<div class="sf-head"><span class="kicker">Rio Itajaí-Açu</span><span class="right"><span class="sf-stamp ${old ? "old" : ""}">${stamp}</span>${badge}</span></div>`;
       if (r) {
         const rate = Math.abs(r.rate) >= .05 ? ` · ${N(Math.round(Math.abs(r.rate) * 100))} cm/h` : "";
         const tr = r.trend === "up" ? [P.ui("arrow-up"), "Subindo" + rate, "var(--hot)"]
           : r.trend === "down" ? [P.ui("arrow-down"), "Descendo" + rate, "var(--cold)"] : [P.ui("minus"), "Estável", "var(--soft)"];
         body = `<div class="sf-body"><div><div class="rv disp">${fmtM(r.level)}<small>m</small></div>` +
           `<div class="trend"><span style="color:${tr[2]};display:flex">${tr[0]}</span><span>${tr[1]}</span></div></div>` +
-          `<div class="chart" id="riverChart"></div></div>`;
+          `<div class="chart ${+P.cfg.get("river.cota") > 0 ? "has-cota" : ""}" id="riverChart"></div></div>`;
       }
     } else {
       head = `<div class="sf-head"><span class="kicker">Defesa Civil · Blumenau</span></div>`;
@@ -353,6 +384,28 @@
       ? `<div class="sf-action" style="background:${s.bg};color:${s.fg}">${P.ui(s.icon)}<span>${U.nums(s.msg)}</span><span class="tel">${P.ui("phone")}Defesa Civil ${N("199")}</span></div>` : "";
 
     el.safety.innerHTML = head + action + body + dc;
+  }
+
+  const f1 = v => v.toFixed(1);
+  /** Curva monotônica pelos pontos (Fritsch–Carlson): suave, sem inventar picos ou vales entre as leituras */
+  function smoothPath(pts) {
+    const n = pts.length;
+    if (n < 3) return "M" + pts.map(q => f1(q[0]) + "," + f1(q[1])).join("L");
+    const dx = [], m = [], t = [];
+    for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1][0] - pts[i][0] || 1e-6; m[i] = (pts[i + 1][1] - pts[i][1]) / dx[i]; }
+    t[0] = m[0]; t[n - 1] = m[n - 2];
+    for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+    for (let i = 0; i < n - 1; i++) {
+      if (m[i] === 0) { t[i] = t[i + 1] = 0; continue; }
+      const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+      if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+    }
+    let d = `M${f1(pts[0][0])},${f1(pts[0][1])}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h = dx[i] / 3;
+      d += `C${f1(pts[i][0] + h)},${f1(pts[i][1] + t[i] * h)} ${f1(pts[i + 1][0] - h)},${f1(pts[i + 1][1] - t[i + 1] * h)} ${f1(pts[i + 1][0])},${f1(pts[i + 1][1])}`;
+    }
+    return d;
   }
 
   /** Gráfico das últimas 24 h: linha do nível, faixas oficiais na régua da direita, cota da rua */
@@ -379,16 +432,17 @@
       if (c.level >= top) return;
       s += `<rect x="${bx}" y="${y(hi) + 1}" width="${bw}" height="${Math.max(1, y(c.level) - y(hi) - 2)}" rx="${bw / 2}" fill="${c.bg}"/>`;
     });
-    // área + linha
-    const pts = ser.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`);
-    const line = "M" + pts.join("L");
-    // preenchimento: neutro quando está normal; na cor da faixa a partir de "Observação"
-    const fill = r.sev >= 2 ? `fill="${r.cond.bg}" opacity=".24"` : `fill="var(--text-c)" opacity=".07"`;
-    s += `<path d="${line}L${x(ser.length - 1).toFixed(1)},${H}L0,${H}Z" ${fill}/>`;
-    s += `<path d="${line}" fill="none" stroke="var(--text-c)" stroke-width="${(.42 * rem).toFixed(1)}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // área + linha; o preenchimento é neutro quando está normal e na cor da faixa a partir de "Observação"
+    const line = smoothPath(ser.map((p, i) => [x(i), y(p.v)]));
+    const tint = r.sev >= 2 ? r.cond.bg : "var(--text-c)", a0 = r.sev >= 2 ? .42 : .16;
+    s += `<defs><linearGradient id="rvFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${tint};stop-opacity:${a0}"/>` +
+      `<stop offset="1" style="stop-color:${tint};stop-opacity:0"/></linearGradient></defs>`;
+    s += `<path d="${line}L${f1(x(ser.length - 1))},${H}L0,${H}Z" fill="url(#rvFill)"/>`;
+    s += `<path d="${line}" fill="none" stroke="var(--text-c)" stroke-width="${f1(.38 * rem)}" stroke-linejoin="round" stroke-linecap="round"/>`;
     if (cota) s += `<line x1="0" x2="${pw}" y1="${y(cota)}" y2="${y(cota)}" stroke="var(--accent)" stroke-width="${(.28 * rem).toFixed(1)}" stroke-dasharray="${rem} ${.7 * rem}"/>`;
     const lx = x(ser.length - 1), ly = y(ser[ser.length - 1].v);
-    s += `<circle cx="${lx}" cy="${ly}" r="${rem}" fill="var(--text-c)" stroke="var(--bg)" stroke-width="${(.35 * rem).toFixed(1)}"/>`;
+    s += `<circle cx="${lx}" cy="${ly}" r="${f1(2.4 * rem)}" style="fill:var(--text-c);opacity:.14"/>`;
+    s += `<circle cx="${lx}" cy="${ly}" r="${rem}" fill="var(--text-c)" stroke="var(--bg)" stroke-width="${f1(.35 * rem)}"/>`;
     let labels = "", lastY = Infinity;
     r.conds.filter(c => c.level > 0 && c.level < top).forEach(c => {          // de baixo para cima; pula o que encostaria no anterior
       const yy = y(c.level);
@@ -473,7 +527,7 @@
 
   function renderAll() {
     applyLook();
-    lastTime = ""; lastMinute = -1;
+    lastTime = ""; lastMinute = -1; lastClock = ""; skyAt = -1;
     tick();                                   // tick → minute → agenda, tempo à frente, rio, encaixe
     renderNow(); renderStatus();
     layout();
@@ -485,7 +539,7 @@
     P.bus.on("wake", () => P.view.resetDay());
     P.bus.on("cfg", () => renderAll());
     P.bus.on("data", which => {
-      if (which === "weather") { renderNow(); renderAhead(); renderWeek(); }
+      if (which === "weather") { renderNow(); renderAhead(); renderWeek(); updateSky(new Date(), true); }
       if (which === "river" || which === "alerts") renderSafety();
       renderStatus();
       layout();

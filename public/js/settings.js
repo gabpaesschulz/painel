@@ -168,7 +168,8 @@
       `<div class="btns"><button class="btn" data-act="restNow">Ver o descanso agora</button></div>`) +
       sec("Noite",
         row("Modo noite", "No horário abaixo o painel escurece e entra em descanso depois de 1 minuto sem toque.", toggle("rest.night")) +
-        (r.night ? row("Das", "", `<input type="time" class="in" data-bind="rest.nightStart" value="${esc(r.nightStart)}">`) + row("Até", "", `<input type="time" class="in" data-bind="rest.nightEnd" value="${esc(r.nightEnd)}">`) : "")) +
+        (r.night ? row("Das", "", `<input type="time" class="in" data-bind="rest.nightStart" value="${esc(r.nightStart)}">`) + row("Até", "", `<input type="time" class="in" data-bind="rest.nightEnd" value="${esc(r.nightEnd)}">`) +
+          row("Acordar sozinho de manhã", `No fim da noite (${esc(r.nightEnd)}), o painel sai do descanso sem precisar de toque e fica aceso até alguém usar. Depois disso, segue o tempo de descanso acima.`, toggle("rest.morningWake")) : "")) +
       sec("Tablet com Fully Kiosk",
         (fully ? callout("ok", "✔ <b>Fully Kiosk detectado.</b> O painel acorda quando o tablet vê movimento.") :
           callout("", "Fully Kiosk <b>não detectado</b>. Abra o painel pelo app Fully Kiosk e ligue <b>Configurações Web avançadas → Habilitar interface JavaScript</b> e <b>Detecção de movimento</b>.")) +

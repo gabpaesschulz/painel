@@ -24,7 +24,7 @@ painel/
 | Configurações direto | https://gabpaesschulz.github.io/painel/#config |
 | Código | https://github.com/gabpaesschulz/painel |
 | Servidor da agenda (Cloudflare) | https://painel.gabpaesschulz.workers.dev |
-| Pasta no PC | `C:\Users\gabri\painel` |
+| Pasta no PC | `C:\Users\gabri\OneDrive\Área de Trabalho\projetos\painel` |
 
 O site é público, mas **a agenda não está nele**: o endereço secreto do Google fica guardado só em cada aparelho onde foi colado. Quem abre o link vê só o tempo, o rio e compromissos de exemplo.
 
@@ -84,9 +84,10 @@ Instale o **Fully Kiosk Browser** (a versão grátis basta). Os nomes das opçõ
 - **Web Content Settings → Start URL:** o endereço do painel.
 - **Fullscreen Mode** ligado; **Show Action Bar** e **Show Address Bar** desligados.
 - **Device Management → Keep Screen On** ligado.
+- **De manhã o painel acorda sozinho:** quando o modo noite termina (06:00, ou o horário em **Tela → Noite → Até**), ele sai do descanso sem precisar de toque e fica aceso até alguém usar; depois disso, volta a seguir o tempo de descanso. Dá para desligar em **Tela → Acordar sozinho de manhã**.
 - **Versões novas entram sozinhas:** o painel confere a cada 30 min e recarrega quando está em descanso (ou sem toque há 5 min), e volta direto para o descanso. Uma vez por dia também recarrega no descanso, para não acumular memória. Para forçar na hora: deslize da borda esquerda → **Load Start URL**.
 
-Opcional, com licença PLUS (paga): *Motion Detection* acende a tela quando alguém passa, e *Enable JavaScript Interface* faz o painel sair do descanso junto. Sem isso, um toque na tela acorda.
+Opcional, com licença PLUS (paga): *Motion Detection* acende a tela quando alguém passa, e *Enable JavaScript Interface* faz o painel sair do descanso junto. Sem isso, um toque na tela acorda (e de manhã ele acorda sozinho). Se ligar *Apagar a tela do tablet no descanso*, a tela só volta de manhã se a *JavaScript Interface* estiver ligada.
 
 Sem Fully, abra no Chrome → ⋮ → **Adicionar à tela inicial** (abre em tela cheia). O painel pede ao navegador para manter a tela ligada.
 
@@ -97,7 +98,7 @@ Sem Fully, abra no Chrome → ⋮ → **Adicionar à tela inicial** (abre em tel
 - **Agenda:** Google Agenda, teste de conexão e feriados.
 - **Lembretes:** remédios e rotinas diárias, sem precisar do Google.
 - **Rio e Defesa Civil:** nível do Itajaí-Açu, **cota de enchente da sua rua** (o painel desenha a linha no gráfico e avisa quando o rio chega perto) e avisos de chuva e deslizamento **do seu bairro**.
-- **Tela:** descanso, modo noite, integração com o Fully Kiosk.
+- **Tela:** descanso, modo noite, acordar sozinho de manhã, integração com o Fully Kiosk.
 - **Avançado:** endereço do servidor, copiar configurações para outro aparelho (código), voltar ao padrão.
 
 ## 6. Testes
@@ -117,6 +118,7 @@ O GitHub roda os dois primeiros antes de cada publicação. Se algum falhar, nad
 - **Testado no uso real:** site no GitHub Pages, servidor na Cloudflare, Google Agenda pelo endereço secreto, Fully Kiosk no tablet.
 - **Não testado:** com os usuários finais; o painel numa cheia de verdade (os alertas foram simulados alterando os dados oficiais); os eventos de movimento do Fully (exigem a licença PLUS).
 - **Testado com o Chrome sem janela (17/10/2026):** avisos da Defesa Civil sem atualizar há 26 h, com e sem alerta (inclusive no modo compacto); avisos lidos ao vivo pelo servidor; versão nova chegando durante o descanso (recarrega e volta descansando); evento de dia inteiro hoje e viagem de vários dias já em andamento; agenda olhando 3 dias com a faixa da semana completa; agenda fora do ar há 2 h (mostra "Agenda sem atualizar", não "Semana livre"); rio com leituras de 15 em 15 min. O download do GitHub foi testado com a Defesa Civil fora do ar, com e sem cópia publicada.
+- **Testado com o Chrome sem janela (23/10/2026), versão 2.2:** despertar de manhã com o relógio acelerado (acorda logo depois das 06:00, continua aceso além dos 10 min sem toque e volta a descansar às 22:00; o descanso de dia não acorda sozinho); 5 temas; 16:10, 4:3 e 2:1; letras A+++ com o relógio dos dois lados; aurora, dia, fim de tarde e noite; rio em alerta com a cota da rua; descanso com aviso; dia escolhido; semana livre; modo leve.
 - O nível do rio depende do que a Defesa Civil publica. Se a leitura ficar com mais de 3 horas, o painel avisa "Dado antigo". Os avisos também: se ninguém conseguir consultar a Defesa Civil há mais de 3 horas, aparece "sem atualizar" no lugar de "tudo normal".
 
 ## Créditos

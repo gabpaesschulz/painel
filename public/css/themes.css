@@ -15,6 +15,13 @@
   --tone2: #5e4217;
   --grain: .09;
   --glow: 1;
+  --surface-1: rgba(255, 247, 232, .085);
+  --surface-2: rgba(255, 247, 232, .028);
+  --raise: rgba(255, 247, 232, .085);
+  --hair: rgba(255, 247, 232, .1);
+  --edge: rgba(255, 247, 232, .13);
+  --depth: 0 2.4rem 6rem -2.4rem rgba(0, 0, 0, .75);
+  --sun-a: .16;
 }
 [data-theme="papel"] {
   --bg: #f7f0e3;
@@ -31,6 +38,13 @@
   --tone2: #efd6a8;
   --grain: .05;
   --glow: 1;
+  --surface-1: rgba(255, 255, 255, .8);
+  --surface-2: rgba(255, 252, 246, .52);
+  --raise: rgba(255, 255, 255, .95);
+  --hair: rgba(28, 23, 18, .1);
+  --edge: rgba(255, 255, 255, .95);
+  --depth: 0 1.8rem 4.8rem -1.8rem rgba(80, 50, 10, .24);
+  --sun-a: .6;
 }
 [data-theme="contraste"] {
   --bg: #000000;
@@ -47,6 +61,13 @@
   --tone2: #000000;
   --grain: 0;
   --glow: 0;
+  --surface-1: #0c0c0c;
+  --surface-2: #0c0c0c;
+  --raise: #1c1c1c;
+  --hair: rgba(255, 255, 255, .5);
+  --edge: transparent;
+  --depth: none;
+  --sun-a: 0;
 }
 [data-theme="oceano"] {
   --bg: #061320;
@@ -63,6 +84,13 @@
   --tone2: #0b4f4a;
   --grain: .08;
   --glow: 1;
+  --surface-1: rgba(220, 245, 255, .085);
+  --surface-2: rgba(220, 245, 255, .028);
+  --raise: rgba(220, 245, 255, .085);
+  --hair: rgba(220, 245, 255, .11);
+  --edge: rgba(220, 245, 255, .14);
+  --depth: 0 2.4rem 6rem -2.4rem rgba(0, 8, 16, .75);
+  --sun-a: .14;
 }
 [data-theme="floresta"] {
   --bg: #07120d;
@@ -79,13 +107,27 @@
   --tone2: #4a3a12;
   --grain: .08;
   --glow: 1;
+  --surface-1: rgba(235, 250, 225, .08);
+  --surface-2: rgba(235, 250, 225, .026);
+  --raise: rgba(235, 250, 225, .08);
+  --hair: rgba(235, 250, 225, .1);
+  --edge: rgba(235, 250, 225, .13);
+  --depth: 0 2.4rem 6rem -2.4rem rgba(0, 10, 4, .75);
+  --sun-a: .16;
 }
 
-/* Cor da luz do céu conforme a hora do dia (mistura com o tom do tema) */
-[data-sky="dawn"]  { --sky1: #c9835a; --sky2: #e6a36a; }
-[data-sky="day"]   { --sky1: #4f7fb0; --sky2: #c9a24a; }
-[data-sky="dusk"]  { --sky1: #a2476a; --sky2: #d9683c; }
-[data-sky="night"] { --sky1: #1d2b5a; --sky2: #4a2468; }
+/* Cor da luz do céu conforme a hora do dia (mistura com o tom do tema) e do "sol" que atravessa a tela.
+   De noite é a lua: fria e mais fraca. Com tempo fechado, a luz enfraquece (--wx-k).
+   Cores saturadas e escuras de propósito: dão cor sem clarear demais o fundo. A força (--sun-a de cada tema)
+   foi medida para que o texto suave continue ≥ 7:1 no pior horário (sol limpo passando atrás do texto). */
+[data-sky="dawn"]   { --sky1: #c9835a; --sky2: #e6a36a; --sun: #ff6f4a; --sun-k: 1; }
+[data-sky="day"]    { --sky1: #4f7fb0; --sky2: #c9a24a; --sun: #ffb13b; --sun-k: 1; }
+[data-sky="golden"] { --sky1: #b0703a; --sky2: #e08a3c; --sun: #ff8a1f; --sun-k: 1; }
+[data-sky="dusk"]   { --sky1: #a2476a; --sky2: #d9683c; --sun: #e0457a; --sun-k: 1; }
+[data-sky="night"]  { --sky1: #1d2b5a; --sky2: #4a2468; --sun: #5866ff; --sun-k: .8; }
+[data-wx="cloud"] { --wx-k: .72; }
+[data-wx="rain"]  { --wx-k: .56; }
+[data-wx="storm"] { --wx-k: .42; }
 
 :root { --g1: var(--tone1); --g2: var(--tone2); }
 @supports (color: color-mix(in srgb, red, blue)) {
@@ -97,4 +139,20 @@
 
 /* Tema claro: a luz do céu fica só um leve tom quente (sem azul-noite no papel) */
 [data-theme="papel"][data-sky] { --sky1: var(--tone1); --sky2: var(--tone2); }
+/* no papel, a luz é pastel: tinge o creme sem escurecê-lo (o texto é escuro) */
+[data-theme="papel"][data-sky="dawn"]   { --sun: #ffd2bd; }
+[data-theme="papel"][data-sky="day"]    { --sun: #ffe6ad; }
+[data-theme="papel"][data-sky="golden"] { --sun: #ffd59a; }
+[data-theme="papel"][data-sky="dusk"]   { --sun: #fbc6d6; }
+[data-theme="papel"][data-sky="night"]  { --sun: #e2deff; }
 [data-theme="contraste"][data-sky] { --sky1: #000; --sky2: #000; }
+
+/* Derivados do destaque: fundo tingido (selos) e brilho (sombra do "hoje") */
+:root { --accent-tint: rgba(255, 200, 87, .15); --accent-glow: rgba(255, 200, 87, .4); }
+@supports (color: color-mix(in srgb, red, blue)) {
+  :root, [data-theme] {
+    --accent-tint: color-mix(in srgb, var(--accent) 15%, transparent);
+    --accent-glow: color-mix(in srgb, var(--accent) 42%, transparent);
+  }
+}
+[data-theme="contraste"] { --accent-glow: transparent; }

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const P = (window.P = window.P || {});
-  P.VERSION = "2.1";
+  P.VERSION = "2.2";
   P.build = "";                // publicação no ar (version.json, gravado pelo GitHub); vazio no PC
 
   /* ---------- barramento de eventos ---------- */
@@ -36,7 +36,7 @@
     alerts: { show: true, bairro: "" },      // avisos da Defesa Civil de Blumenau para o bairro
     calendar: { mode: "demo", icsUrl: "", calId: "", apiKey: "", daysAhead: 7, laterCount: 3 },
     reminders: [],             // { id, time:"08:00", text, days:[0..6] }
-    rest: { idleMin: 10, night: true, nightStart: "22:00", nightEnd: "06:00", dim: 0.4, screenOff: false },
+    rest: { idleMin: 10, night: true, nightStart: "22:00", nightEnd: "06:00", morningWake: true, dim: 0.4, screenOff: false },
     proxy: "",                 // endereço do servidor do painel (se não for o mesmo do site)
   };
 
